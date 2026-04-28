@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(go build *)",
+      "Bash(go test *)",
+      "Bash(go vet *)",
+      "Bash(go fmt *)",
+      "Bash(go mod *)",
+      "Bash(go run *)",
+      "Bash(golangci-lint *)",
+      "Bash(make *)",
+      "Bash(npm *)",
+      "Bash(pnpm *)",
+      "Bash(yarn *)",
+      "Bash(node *)",
+      "Bash(docker build *)",
+      "Bash(docker compose *)",
+      "Bash(docker ps *)",
+      "Bash(docker logs *)",
+      "Bash(terraform fmt *)",
+      "Bash(terraform validate *)",
+      "Bash(terraform plan *)",
+      "Bash(kubectl get *)",
+      "Bash(kubectl describe *)",
+      "Bash(kubectl logs *)",
+      "Bash(curl *)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(cat *)",
+      "Bash(echo *)",
+      "Bash(cd *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Bash(kubectl delete *)",
+      "Bash(kubectl apply *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(docker rm -f *)",
+      "Bash(drop table *)",
+      "Bash(truncate *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"process.stderr.write('\\n🏗️  Full-Stack Project | Claude Code Workspace\\n📦 Domains: Frontend · Backend (Go) · Infrastructure · Testing · Product\\n⚡ Commands: /analyze_codebase /plan_feature /generate_prd /design_architecture /review_code /setup_infra /run_tests\\n\\n');\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const cmd = process.env.CLAUDE_TOOL_INPUT || ''; const dangerous = ['git push --force', 'git reset --hard', 'rm -rf', 'terraform destroy', 'terraform apply', 'kubectl delete', 'kubectl apply']; const found = dangerous.find(d => cmd.includes(d)); if (found) { process.stderr.write('⚠️  WARNING: Potentially destructive command detected: ' + found + '\\nPlease confirm this is intentional.\\n'); process.exit(1); }\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
