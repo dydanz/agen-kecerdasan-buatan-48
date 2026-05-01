@@ -5,41 +5,49 @@ import (
 	"time"
 )
 
+// Role represents the speaker in a conversation turn.
+type Role string
+
+const (
+	RoleUser      Role = "user"
+	RoleAssistant Role = "assistant"
+)
+
 type TokenUsage struct {
-	InputTokens  int64
-	OutputTokens int64
-	CacheRead    int64
-	CacheWrite   int64
+	InputTokens  int64 `json:"input_tokens"`
+	OutputTokens int64 `json:"output_tokens"`
+	CacheRead    int64 `json:"cache_read"`
+	CacheWrite   int64 `json:"cache_write"`
 }
 
 type ToolCall struct {
-	ID    string
-	Name  string
-	Input json.RawMessage
+	ID    string          `json:"id"`
+	Name  string          `json:"name"`
+	Input json.RawMessage `json:"input"`
 }
 
 type ToolResult struct {
-	ToolCallID string
-	Output     string
-	IsError    bool
-	DurationMs int64
+	ToolCallID string `json:"tool_call_id"`
+	Output     string `json:"output"`
+	IsError    bool   `json:"is_error"`
+	DurationMs int64  `json:"duration_ms"`
 }
 
 type Message struct {
-	SessionID string
-	Text      string
-	UserID    string
-	Timestamp time.Time
+	SessionID string    `json:"session_id"`
+	Text      string    `json:"text"`
+	UserID    string    `json:"user_id"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 type Response struct {
-	Text       string
-	TokenUsage TokenUsage
-	LatencyMs  int64
+	Text       string     `json:"text"`
+	TokenUsage TokenUsage `json:"token_usage"`
+	LatencyMs  int64      `json:"latency_ms"`
 }
 
 // LLMMessage is a single turn in conversation history passed to the LLM caller.
 type LLMMessage struct {
-	Role    string // "user" or "assistant"
-	Content string
+	Role    Role   `json:"role"`
+	Content string `json:"content"`
 }
