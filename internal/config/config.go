@@ -1,23 +1,13 @@
-// Package config loads and validates Klawmbing configuration from a TOML file.
+// internal/config/config.go
 package config
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/BurntSushi/toml"
 )
 
-// Config is the top-level Klawmbing configuration.
-type Config struct {
-	LLM      LLMConfig      `toml:"llm"`
-	Adapters AdaptersConfig `toml:"adapters"`
-	Brain    BrainConfig    `toml:"brain"`
-	Session  SessionConfig  `toml:"session"`
-	Skills   SkillsConfig   `toml:"skills"`
-	Identity IdentityConfig `toml:"identity"`
-}
-
-// LLMConfig holds model and API configuration.
 type LLMConfig struct {
 	Model               string `toml:"model"`
 	ExtractionModel     string `toml:"extraction_model"`
@@ -27,36 +17,33 @@ type LLMConfig struct {
 	MaxToolResultTokens int    `toml:"max_tool_result_tokens"`
 }
 
-// AdaptersConfig holds per-adapter settings.
-type AdaptersConfig struct {
-	CLI      CLIAdapterConfig      `toml:"cli"`
-	Telegram TelegramAdapterConfig `toml:"telegram"`
-}
-
-// CLIAdapterConfig holds CLI adapter settings.
-type CLIAdapterConfig struct {
+type CLIConfig struct {
 	Enabled bool `toml:"enabled"`
 }
 
-// TelegramAdapterConfig holds Telegram adapter settings.
-type TelegramAdapterConfig struct {
+type TelegramConfig struct {
 	Enabled             bool    `toml:"enabled"`
 	TokenEnv            string  `toml:"token_env"`
 	AllowedUserIDs      []int64 `toml:"allowed_user_ids"`
-	StreamingIntervalMS int     `toml:"streaming_interval_ms"`
+	StreamingIntervalMs int     `toml:"streaming_interval_ms"`
 }
 
-// BrainConfig holds GBrain/MCP settings.
+type AdaptersConfig struct {
+	CLI      CLIConfig      `toml:"cli"`
+	Telegram TelegramConfig `toml:"telegram"`
+}
+
 type BrainConfig struct {
 	Enabled              bool     `toml:"enabled"`
 	MCPTransport         string   `toml:"mcp_transport"`
 	GBrainCommand        string   `toml:"gbrain_command"`
 	GBrainArgs           []string `toml:"gbrain_args"`
+	GBrainWorkingDir     string   `toml:"gbrain_working_dir"`
+	ToolPrefix           string   `toml:"tool_prefix"`
 	HealthCheckIntervalS int      `toml:"health_check_interval_s"`
 	MaxRestartAttempts   int      `toml:"max_restart_attempts"`
 }
 
-// SessionConfig holds session persistence settings.
 type SessionConfig struct {
 	StorageDir                 string `toml:"storage_dir"`
 	MaxTurnsInContext          int    `toml:"max_turns_in_context"`
@@ -67,60 +54,82 @@ type SessionConfig struct {
 	LoadOnStartup              bool   `toml:"load_on_startup"`
 }
 
-// SkillsConfig holds skill system settings.
 type SkillsConfig struct {
 	Dir string `toml:"dir"`
 }
 
-// IdentityConfig holds identity file settings.
 type IdentityConfig struct {
 	Dir string `toml:"dir"`
 }
 
-// Load reads the TOML config at path, decodes it, and validates required fields.
-// It returns an error if the file cannot be read, decoded, or fails validation.
+type Config struct {
+	LLM      LLMConfig      `toml:"llm"`
+	Adapters AdaptersConfig `toml:"adapters"`
+	Brain    BrainConfig    `toml:"brain"`
+	Session  SessionConfig  `toml:"session"`
+	Skills   SkillsConfig   `toml:"skills"`
+	Identity IdentityConfig `toml:"identity"`
+}
+
 func Load(path string) (*Config, error) {
 	var cfg Config
 	if _, err := toml.DecodeFile(path, &cfg); err != nil {
-		return nil, fmt.Errorf("config: decode %q: %w", path, err)
+		return nil, fmt.Errorf("decode config: %w", err)
 	}
-	if err := validate(&cfg); err != nil {
-		return nil, fmt.Errorf("config: validation failed: %w", err)
+	cfg.applyDefaults()
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 	return &cfg, nil
 }
 
-// validate checks required fields and cross-field constraints.
-func validate(cfg *Config) error {
-	if cfg.LLM.Model == "" {
+func (c *Config) applyDefaults() {
+	if c.LLM.MaxToolRounds == 0 {
+		c.LLM.MaxToolRounds = 5
+	}
+	if c.LLM.MaxToolResultTokens == 0 {
+		c.LLM.MaxToolResultTokens = 500
+	}
+	if c.LLM.MaxTokens == 0 {
+		c.LLM.MaxTokens = 4096
+	}
+	if c.Session.MaxTurnsInContext == 0 {
+		c.Session.MaxTurnsInContext = 50
+	}
+	if c.Session.MaxContextTokens == 0 {
+		c.Session.MaxContextTokens = 32000
+	}
+	if c.Session.ColdResumeThresholdMinutes == 0 {
+		c.Session.ColdResumeThresholdMinutes = 30
+	}
+	if c.Adapters.Telegram.StreamingIntervalMs == 0 {
+		c.Adapters.Telegram.StreamingIntervalMs = 1000
+	}
+	if c.Brain.HealthCheckIntervalS == 0 {
+		c.Brain.HealthCheckIntervalS = 30
+	}
+	if c.Brain.MaxRestartAttempts == 0 {
+		c.Brain.MaxRestartAttempts = 3
+	}
+	if c.Brain.ToolPrefix == "" {
+		c.Brain.ToolPrefix = "gbrain"
+	}
+}
+
+func (c *Config) validate() error {
+	if c.LLM.Model == "" {
 		return fmt.Errorf("llm.model is required")
 	}
-	if cfg.LLM.ExtractionModel == "" {
-		return fmt.Errorf("llm.extraction_model is required")
-	}
-	if cfg.LLM.APIKeyEnv == "" {
+	if c.LLM.APIKeyEnv == "" {
 		return fmt.Errorf("llm.api_key_env is required")
 	}
-	if cfg.Session.StorageDir == "" {
-		return fmt.Errorf("session.storage_dir is required")
-	}
-	if cfg.Session.MaxTurnsInContext <= 0 {
-		return fmt.Errorf("session.max_turns_in_context must be > 0")
-	}
-	if cfg.Session.MaxTurnsBeforeCompaction <= 0 {
-		return fmt.Errorf("session.max_turns_before_compaction must be > 0")
-	}
-	if cfg.Session.MaxFileSizeMB <= 0 {
-		return fmt.Errorf("session.max_file_size_mb must be > 0")
-	}
-	if cfg.Skills.Dir == "" {
-		return fmt.Errorf("skills.dir is required")
-	}
-	if cfg.Identity.Dir == "" {
-		return fmt.Errorf("identity.dir is required")
-	}
-	if cfg.Adapters.Telegram.Enabled && cfg.Adapters.Telegram.TokenEnv == "" {
-		return fmt.Errorf("adapters.telegram.token_env is required when telegram is enabled")
+	if os.Getenv(c.LLM.APIKeyEnv) == "" {
+		return fmt.Errorf("env var %q (llm.api_key_env) is not set", c.LLM.APIKeyEnv)
 	}
 	return nil
+}
+
+// AnthropicAPIKey reads the API key from the configured environment variable.
+func (c *Config) AnthropicAPIKey() string {
+	return os.Getenv(c.LLM.APIKeyEnv)
 }
