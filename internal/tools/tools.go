@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dydanz/klawmbing/internal/types"
 	"github.com/google/uuid"
+	"github.com/dydanz/klawmbing/internal/types"
 )
 
 // ToolHandler is the function signature for all registered tool implementations.
@@ -21,12 +21,18 @@ type ToolDefinition struct {
 	InputSchema json.RawMessage
 }
 
+type cachedResult struct {
+	toolName   string
+	output     string
+	durationMs int64
+}
+
 // Registry holds registered tools and dispatches calls with idempotency.
 type Registry struct {
 	mu          sync.RWMutex
 	handlers    map[string]ToolHandler
 	definitions map[string]ToolDefinition
-	idempotency sync.Map // map[string]string: idempotency_key -> output
+	idempotency sync.Map // map[string]cachedResult
 }
 
 func NewRegistry() *Registry {
@@ -56,14 +62,26 @@ func (r *Registry) Definitions() []ToolDefinition {
 }
 
 // Execute dispatches a tool call. idempotencyKey prevents double-execution on retries.
-// Pass an empty string to generate a random key (no deduplication).
+// Pass an empty string to skip deduplication (generates a random key each time).
 func (r *Registry) Execute(ctx context.Context, call types.ToolCall, idempotencyKey string) types.ToolResult {
 	if idempotencyKey == "" {
 		idempotencyKey = uuid.New().String()
 	}
 
-	if cached, ok := r.idempotency.Load(idempotencyKey); ok {
-		return types.ToolResult{ToolCallID: call.ID, Output: cached.(string)}
+	if raw, ok := r.idempotency.Load(idempotencyKey); ok {
+		cached := raw.(cachedResult)
+		if cached.toolName != call.Name {
+			return types.ToolResult{
+				ToolCallID: call.ID,
+				Output:     fmt.Sprintf("idempotency key collision: key was used for tool %q, now called for %q", cached.toolName, call.Name),
+				IsError:    true,
+			}
+		}
+		return types.ToolResult{
+			ToolCallID: call.ID,
+			Output:     cached.output,
+			DurationMs: cached.durationMs,
+		}
 	}
 
 	r.mu.RLock()
@@ -91,7 +109,11 @@ func (r *Registry) Execute(ctx context.Context, call types.ToolCall, idempotency
 		}
 	}
 
-	r.idempotency.Store(idempotencyKey, output)
+	r.idempotency.Store(idempotencyKey, cachedResult{
+		toolName:   call.Name,
+		output:     output,
+		durationMs: dur,
+	})
 	return types.ToolResult{
 		ToolCallID: call.ID,
 		Output:     output,

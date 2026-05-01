@@ -75,6 +75,22 @@ func TestRegistry_Definitions(t *testing.T) {
 	}
 }
 
+func TestRegistry_IdempotencyKeyCollisionReturnsError(t *testing.T) {
+	reg := tools.NewRegistry()
+	noop := func(_ context.Context, _ json.RawMessage) (string, error) { return "ok", nil }
+	reg.Register(tools.ToolDefinition{Name: "tool_a"}, noop)
+	reg.Register(tools.ToolDefinition{Name: "tool_b"}, noop)
+
+	// First call with tool_a registers the key
+	reg.Execute(context.Background(), types.ToolCall{ID: "c1", Name: "tool_a"}, "shared-key")
+
+	// Second call reuses same key but for tool_b — must be an error
+	result := reg.Execute(context.Background(), types.ToolCall{ID: "c2", Name: "tool_b"}, "shared-key")
+	if !result.IsError {
+		t.Error("expected IsError=true for cross-tool idempotency collision")
+	}
+}
+
 func TestRegistry_DurationRecorded(t *testing.T) {
 	reg := tools.NewRegistry()
 	reg.Register(tools.ToolDefinition{Name: "fast"}, func(_ context.Context, _ json.RawMessage) (string, error) {
