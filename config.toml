@@ -1,0 +1,39 @@
+[llm]
+model = "claude-sonnet-4-6-20260326"
+extraction_model = "claude-haiku-4-5-20251001"
+api_key_env = "ANTHROPIC_API_KEY"
+max_tokens = 4096
+max_tool_rounds = 5
+max_tool_result_tokens = 500
+
+[adapters.cli]
+enabled = true
+
+[adapters.telegram]
+enabled = false
+token_env = "TELEGRAM_BOT_TOKEN"
+allowed_user_ids = []
+streaming_interval_ms = 1000
+
+[brain]
+enabled = false
+mcp_transport = "stdio"
+gbrain_command = "gbrain"
+gbrain_args = ["serve"]
+health_check_interval_s = 30
+max_restart_attempts = 3
+
+[session]
+storage_dir = "sessions"
+max_turns_in_context = 50
+max_turns_before_compaction = 30
+max_file_size_mb = 10
+max_context_tokens = 32000
+cold_resume_threshold_minutes = 30
+load_on_startup = true
+
+[skills]
+dir = "skills"
+
+[identity]
+dir = "identity"
