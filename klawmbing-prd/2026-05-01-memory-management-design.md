@@ -75,9 +75,9 @@ Tier 3 is capped at ~400 tokens (3 brain results). Tier 4 is the last 2 turns + 
 ### ContextAssembler changes (vs PRD-04)
 
 The existing `ContextAssembler` in PRD-04 is extended with:
-- `cache_boundary_after`: marks which message index gets `cache_control: ephemeral` appended
-- Tier 2 assembly: collects `session.turns[:-2]` as cached messages, `session.turns[-2:]` into Tier 4
-- Tier 3 slot: a nullable `cold_context: str | None` inserted between Tier 2 and Tier 4
+- `cacheBoundaryAfter`: field on the `ContextAssembler` struct that marks which message index gets `cache_control: ephemeral` appended
+- Tier 2 assembly: collects `session.Turns[:len(session.Turns)-2]` as cached messages, `session.Turns[len(session.Turns)-2:]` into Tier 4
+- Tier 3 slot: a `coldContext string` parameter passed to `Build()`, inserted between Tier 2 and Tier 4; empty string means no cold context
 
 ---
 
@@ -85,9 +85,9 @@ The existing `ContextAssembler` in PRD-04 is extended with:
 
 ### When it fires
 
-```python
-is_cold = (session.turn_count == 0) or
-          (now - session.last_turn_at > timedelta(minutes=cold_resume_threshold_minutes))
+```go
+isCold := session.TurnCount() == 0 ||
+    time.Since(session.UpdatedAt) > time.Duration(cfg.ColdResumeThresholdMinutes)*time.Minute
 ```
 
 Default threshold: 30 minutes. Configurable via `session.cold_resume_threshold_minutes`.
@@ -101,11 +101,11 @@ Default threshold: 30 minutes. Configurable via `session.cold_resume_threshold_m
 ```
 [What I recall that may be relevant]
 - Dandi decided to use PostgreSQL + pgvector for brain storage (decision, 2025-03-15)
-- GBrain serve must be running before klawmbing.py starts (project:klawmbing)
-- Startup sequence: gbrain serve → python klawmbing.py (project:klawmbing)
+- GBrain serve must be running before klawmbing starts (project:klawmbing)
+- Startup sequence: gbrain serve → ./klawmbing (project:klawmbing)
 ```
 
-4. On subsequent turns, `is_cold` naturally evaluates to `False`: `turn_count > 0` and `last_turn_at` is recent. No extra flag required. Tier 3 is omitted automatically.
+4. On subsequent turns, `isCold` naturally evaluates to `false`: `TurnCount() > 0` and `UpdatedAt` is recent. No extra flag required. Tier 3 is omitted automatically.
 
 ### Fallback
 
@@ -124,7 +124,7 @@ Cold opens are rare (once per session). At that frequency, Haiku adds ~200ms and
 | Type | What it captures | Example |
 |------|-----------------|---------|
 | `person` | Team members — role, timezone, working style | "Andi — backend lead, UTC+8, Go-primary" |
-| `project` | Active and past projects — status, tech stack | "klawmbing — self-hosted agent runtime, Python, planning phase" |
+| `project` | Active and past projects — status, tech stack | "klawmbing — self-hosted agent runtime, Go, planning phase" |
 | `decision` | Architectural/product/business decisions with rationale | "Chose stdio MCP over HTTP SSE — simpler, co-located VPS" |
 | `product` | Products you operate or build, their boundaries | "GBrain — knowledge brain, separate lifecycle from klawmbing" |
 | `policy` | Standing rules and constraints | "Never push to main — always PRs, always human approval" |
@@ -179,7 +179,7 @@ USER.md remains as the static startup bootstrap — the LLM's initial operator c
 max_tool_rounds = 5
 ```
 
-The LLM caller in `llm.py` tracks round count per LLM call. On hitting the limit, the tool loop exits and the last assistant message is returned. A warning is logged. No error surfaced to the user. Five rounds is generous for normal use; runaway loops typically reach 8–15 before this fires.
+The LLM caller in `internal/llm/llm.go` tracks round count per LLM call. On hitting the limit, the tool loop exits and the last assistant message is returned. A warning is logged. No error surfaced to the user. Five rounds is generous for normal use; runaway loops typically reach 8–15 before this fires.
 
 ### Tool result truncation
 
@@ -223,7 +223,7 @@ Effective cost reduction on the dominant token blocks (Tier 1+2): ~85–90% vers
 | PRD-01 (Core Runtime) | Add `max_tool_rounds`, `max_tool_result_tokens` to config schema and LLM caller |
 | PRD-03 (GBrain) | Cold opener uses `gbrain_search` with `entity_types` filter; update tool call signature |
 | PRD-04 (Identity & Skills) | ContextAssembler gains 4-tier structure with `cache_control` boundaries; note-capture SKILL.md updated with entity prompt template |
-| PRD-05 (Session) | SessionManager gains `is_cold` detection, `cold_resume_threshold_minutes` config, `max_context_tokens` cap, Tier 2 cache assembly |
+| PRD-05 (Session) | SessionManager gains `isCold` detection, `cold_resume_threshold_minutes` config, `max_context_tokens` cap, Tier 2 cache assembly |
 
 No changes needed to PRD-02 (Channel Adapters).
 
@@ -244,5 +244,5 @@ No changes needed to PRD-02 (Channel Adapters).
 ## Open questions (not blocking Phase 1)
 
 - GBrain `entity_types` filter: confirm this is a supported parameter in `gbrain_search` or add it as a tag-based workaround
-- `max_context_tokens` token counting: use `anthropic.count_tokens()` or `len(text) // 4` heuristic (heuristic acceptable for Phase 1)
+- `max_context_tokens` token counting: use `anthropic.CountTokens()` or `len(text) / 4` heuristic (heuristic acceptable for Phase 1)
 - Phase 2 `scope` enforcement: needs access control design when group sessions are introduced

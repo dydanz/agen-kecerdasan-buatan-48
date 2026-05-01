@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Klawmbing is a **thin, self-hosted AI agent runtime** ("claw") for a solo operator. It connects Telegram/Discord to a compounding knowledge brain (GBrain), routes user intent to markdown skill files, and gets smarter without code deploys. The philosophy is **"thin harness, fat skills"**: the runtime is ~2,000–2,500 lines of Python; the intelligence lives in skill files and GBrain.
+Klawmbing is a **thin, self-hosted AI agent runtime** ("claw") for a solo operator. It connects Telegram/Discord to a compounding knowledge brain (GBrain), routes user intent to markdown skill files, and gets smarter without code deploys. The philosophy is **"thin harness, fat skills"**: the runtime is ~2,000–2,500 lines of Go; the intelligence lives in skill files and GBrain.
 
 The project is currently in **design/planning phase**. All PRDs are in `klawmbing-prd/`, research in `klawmbing-rsh/`. No implementation exists yet. The first milestone is "Hello World" (PRDs 01–05), which proves the chat → LLM → brain → persistence pipeline end-to-end.
 
@@ -15,14 +15,18 @@ The project is currently in **design/planning phase**. All PRDs are in `klawmbin
 ## Running the Project
 
 ```bash
-# Start Klawmbing (entry point)
-python klawmbing.py
+# Build and run
+go build -o klawmbing ./cmd/klawmbing/
+./klawmbing
+
+# Run without building
+go run ./cmd/klawmbing/
 
 # Validate config without starting
-python klawmbing.py --validate
+./klawmbing --validate
 
 # Use a custom config file
-python klawmbing.py --config path/to/config.toml
+./klawmbing --config path/to/config.toml
 
 # GBrain must be running first (PRD-03 manages this automatically)
 gbrain serve
@@ -55,7 +59,7 @@ Context Assembler
     └── Brain context (LLM decides to search via tools, not pre-fetched)
         │
         ▼
-LLM Caller (Claude Sonnet 4.6, streaming, asyncio)
+LLM Caller (Claude Sonnet 4.6, streaming, goroutines + channels)
         │
         ▼
 Tool Executor (idempotency-checked UUID per call)
@@ -64,7 +68,7 @@ Tool Executor (idempotency-checked UUID per call)
     └── GitHub API (Phase 2)
         │
         ▼
-Post-Turn Hooks (fire-and-forget, never break main loop)
+Post-Turn Hooks (fire-and-forget via errgroup, never break main loop)
     ├── Persist session turn → JSONL append
     └── Log metrics → tool-calls.jsonl
 ```
@@ -73,24 +77,33 @@ Post-Turn Hooks (fire-and-forget, never break main loop)
 - `claude-sonnet-4-6` — generation, reasoning, code
 - `claude-haiku-4-5` — fact extraction, summarization (12× cheaper; use for all extraction)
 
+**Streaming:** LLM tokens are sent over a `chan string`; the adapter goroutine consumes the channel and forwards to the user.
+
 ---
 
 ## Project Directory Layout
 
 ```
 ~/.klawmbing/               # Runtime root
-├── klawmbing.py            # Entry point
-├── config.toml             # Config (no secrets — use env vars)
-├── core/
-│   ├── config.py           # Config loader + pydantic validation
-│   ├── runtime.py          # KlawmbingRuntime — wires all components
-│   ├── llm.py              # LLMCaller — Anthropic SDK, streaming, tool loop
-│   ├── tools.py            # ToolRegistry — register/dispatch/log tool calls
-│   └── types.py            # Shared dataclasses: Message, Response, ToolCall, etc.
+├── cmd/klawmbing/
+│   └── main.go             # Entry point
+├── internal/
+│   ├── config/
+│   │   └── config.go       # Config struct + TOML loader
+│   ├── runtime/
+│   │   └── runtime.go      # KlawmbingRuntime — wires all components
+│   ├── llm/
+│   │   └── llm.go          # LLMCaller — Anthropic SDK, streaming, tool loop
+│   ├── tools/
+│   │   └── tools.go        # ToolRegistry — register/dispatch/log tool calls
+│   └── types/
+│       └── types.go        # Shared types: Message, Response, ToolCall, etc.
 ├── adapters/
-│   ├── base.py             # ChannelAdapter ABC
-│   ├── cli.py              # stdin/stdout (~50 lines)
-│   └── telegram.py         # python-telegram-bot v21+, long-polling
+│   ├── adapter.go          # ChannelAdapter interface
+│   ├── cli/
+│   │   └── cli.go          # stdin/stdout (~50 lines)
+│   └── telegram/
+│       └── telegram.go     # go-telegram-bot-api/v5, long-polling
 ├── skills/
 │   ├── RESOLVER.md         # Intent → skill routing table (for reference)
 │   ├── note-capture/SKILL.md
@@ -101,8 +114,11 @@ Post-Turn Hooks (fire-and-forget, never break main loop)
 │   ├── SOUL.md             # Personality and tone
 │   └── USER.md             # Operator profile (loaded at startup, not agent-modifiable)
 ├── sessions/               # <session-id>.jsonl — append-only, one file per session
-└── logs/
-    └── tool-calls.jsonl    # Audit trail for every LLM call and tool invocation
+├── logs/
+│   └── tool-calls.jsonl    # Audit trail for every LLM call and tool invocation
+├── go.mod
+├── go.sum
+└── config.toml
 ```
 
 GBrain lives separately at `~/brain/` — it has its own lifecycle independent of the claw runtime.
@@ -135,10 +151,19 @@ Skill files have YAML frontmatter with `triggers` (keyword phrases). The resolve
 Every side-effecting tool call gets a UUID (`idempotency_key`) checked before execution. This prevents double-deploys and double-PRs on message retries or crashes.
 
 ### Prompt Caching
-The identity layer (AGENTS.md + SOUL.md + USER.md) is identical every turn — mark it with `cache_control` for Claude's prompt caching. The skill injection sits after the cache boundary since it changes per turn.
+The identity layer (AGENTS.md + SOUL.md + USER.md) is identical every turn — mark it with `cache_control` for Claude's prompt caching via `anthropic-sdk-go`. The skill injection sits after the cache boundary since it changes per turn.
+
+### Tool Registry
+Handlers are registered in a `sync.RWMutex`-protected map. Handler signature:
+
+```go
+func(ctx context.Context, input json.RawMessage) (string, error)
+```
+
+Tool dispatch is logged to `tool-calls.jsonl` before and after execution. Idempotency key is checked before invoking any side-effecting handler.
 
 ### Post-Turn Hooks
-Hooks execute after every agent response via `asyncio.gather`. **Failures in hooks must never propagate to the main loop** — catch all exceptions, log them, continue. Built-in hooks: session persistence + metrics logging. Phase 2 adds memory flush and compaction check.
+Hooks execute after every agent response via `errgroup.Go()`. **Failures in hooks must never propagate to the main loop** — recover all panics, log errors, continue. Built-in hooks: session persistence + metrics logging. Phase 2 adds memory flush and compaction check.
 
 ### GBrain MCP Connection
 GBrain is managed as a child subprocess (`gbrain serve` over stdio). Klawmbing:
@@ -149,7 +174,7 @@ GBrain is managed as a child subprocess (`gbrain serve` over stdio). Klawmbing:
 5. If brain is unavailable: all `gbrain_*` tools return an error string; the LLM handles it gracefully; the process continues (degraded mode)
 
 ### Session Persistence
-JSONL files, one per session. **Append-only** — each turn is one line. Never rewrite the full file. On startup, load the most recent session file per session ID. Session file naming: replace `:` with `_` (e.g., `main_telegram_123456789.jsonl`). Warn if any file exceeds 10MB.
+JSONL files, one per session. **Append-only** — each turn is one line. Never rewrite the full file. Use `encoding/json` for marshalling. On startup, load the most recent session file per session ID. Session file naming: replace `:` with `_` (e.g., `main_telegram_123456789.jsonl`). Warn if any file exceeds 10MB.
 
 ---
 
@@ -162,6 +187,8 @@ JSONL files, one per session. **Append-only** — each turn is one line. Never r
 model = "claude-sonnet-4-6-20260326"
 extraction_model = "claude-haiku-4-5-20251001"
 api_key_env = "ANTHROPIC_API_KEY"   # Read from env, never stored
+max_tool_rounds = 5
+max_tool_result_tokens = 500
 
 [adapters.telegram]
 token_env = "TELEGRAM_BOT_TOKEN"
@@ -177,9 +204,11 @@ tool_prefix = "gbrain"
 [session]
 max_turns_in_context = 50
 max_turns_before_compaction = 30    # Phase 2
+max_context_tokens = 32000
+cold_resume_threshold_minutes = 30
 ```
 
-Fail fast on startup for any missing required field. Use `pydantic` for config validation (not stdlib).
+Fail fast on startup for any missing required field. Use struct tags + a validation pass (e.g., `go-playground/validator`) rather than stdlib for config validation.
 
 ---
 

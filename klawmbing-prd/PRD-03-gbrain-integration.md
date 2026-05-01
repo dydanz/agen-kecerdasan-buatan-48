@@ -1,9 +1,10 @@
 # PRD-03: GBrain Integration via MCP
 
-**Status:** Draft v1.0
+**Status:** Draft v2.0 (Go)
 **Parent:** PRD-00 (Klawmbing Master PRD)
 **Author:** Dandi
 **Created:** April 26, 2026
+**Revised:** May 1, 2026
 **Dependencies:** PRD-01 (Core Runtime — tool registry)
 **Estimated Effort:** 2-3 days
 
@@ -84,123 +85,247 @@ GBrain is our chosen brain. It exposes 30+ tools via MCP (Model Context Protocol
 - Lifecycle: Klawmbing manages GBrain as a child process — starts it, monitors it, restarts if crashed
 - Latency: subprocess stdio is faster than localhost HTTP
 
-### 6.2 MCP Client Implementation
+### 6.2 Core Types
 
-```python
-class MCPClient:
-    """
-    Generic MCP client over stdio transport.
-    Manages the subprocess, sends JSON-RPC requests, handles responses.
-    """
+```go
+// internal/brain/types.go
 
-    def __init__(self, command: str, args: list[str] = None):
-        self.command = command
-        self.args = args or []
-        self.process: asyncio.subprocess.Process | None = None
-        self._request_id = 0
-        self._pending: dict[int, asyncio.Future] = {}
+// ToolDefinition is a single MCP tool as returned by tools/list.
+type ToolDefinition struct {
+    Name        string          `json:"name"`
+    Description string          `json:"description"`
+    InputSchema json.RawMessage `json:"inputSchema"`
+}
 
-    async def start(self) -> None:
-        """
-        Start the MCP server as a subprocess.
-        1. Spawn process with stdin/stdout pipes
-        2. Start background reader for stdout
-        3. Send 'initialize' request
-        4. Verify capabilities
-        """
+// jsonrpcRequest is a JSON-RPC 2.0 request envelope.
+type jsonrpcRequest struct {
+    JSONRPC string          `json:"jsonrpc"`
+    ID      int64           `json:"id"`
+    Method  string          `json:"method"`
+    Params  json.RawMessage `json:"params,omitempty"`
+}
 
-    async def stop(self) -> None:
-        """Send shutdown notification, terminate process."""
+// jsonrpcResponse is a JSON-RPC 2.0 response envelope.
+type jsonrpcResponse struct {
+    JSONRPC string          `json:"jsonrpc"`
+    ID      int64           `json:"id"`
+    Result  json.RawMessage `json:"result,omitempty"`
+    Error   *jsonrpcError   `json:"error,omitempty"`
+}
 
-    async def list_tools(self) -> list[dict]:
-        """
-        Call tools/list to discover available tools.
-        Returns list of tool definitions with name, description, inputSchema.
-        """
+// jsonrpcError is the error object inside a JSON-RPC 2.0 response.
+type jsonrpcError struct {
+    Code    int    `json:"code"`
+    Message string `json:"message"`
+}
 
-    async def call_tool(self, name: str, arguments: dict) -> str:
-        """
-        Call tools/call with the given tool name and arguments.
-        Returns the tool result as a string.
-        """
+// ErrBrainUnavailable is returned by all gbrain_* handlers when GBrain is down.
+var ErrBrainUnavailable = errors.New("brain unavailable")
 
-    async def _send_request(self, method: str, params: dict = None) -> dict:
-        """Send a JSON-RPC 2.0 request and await the response."""
-
-    async def _read_loop(self) -> None:
-        """
-        Background task: read lines from subprocess stdout,
-        parse JSON-RPC responses, resolve pending futures.
-        """
-
-    async def _health_check(self) -> bool:
-        """Ping the server. Return False if unresponsive."""
-
-    async def _restart(self) -> None:
-        """Kill and restart the subprocess. Re-discover tools."""
+// BrainConfig is the [brain] section of config.toml, parsed by PRD-01's config loader.
+type BrainConfig struct {
+    Enabled              bool     `toml:"enabled"`
+    MCPTransport         string   `toml:"mcp_transport"`        // "stdio" only in Phase 1
+    GBrainCommand        string   `toml:"gbrain_command"`        // e.g. "gbrain"
+    GBrainArgs           []string `toml:"gbrain_args"`           // e.g. ["serve"]
+    GBrainWorkingDir     string   `toml:"gbrain_working_dir"`    // e.g. "~/brain"
+    HealthCheckInterval  int      `toml:"health_check_interval_s"` // seconds; default 30
+    MaxRestartAttempts   int      `toml:"max_restart_attempts"`  // default 3
+    ToolPrefix           string   `toml:"tool_prefix"`           // default "gbrain"
+}
 ```
 
-### 6.3 GBrain Bridge
+### 6.3 MCPClient
 
-```python
-class GBrainBridge:
-    """
-    Bridges GBrain MCP tools into Klawmbing's tool registry.
-    Handles tool discovery, registration, and health monitoring.
-    """
+`MCPClient` owns the subprocess lifecycle and all JSON-RPC I/O. It is goroutine-safe.
 
-    def __init__(self, config: BrainConfig, tool_registry: ToolRegistry):
-        self.mcp = MCPClient(
-            command=config.gbrain_command,  # "gbrain"
-            args=["serve"]
-        )
-        self.registry = tool_registry
-        self.connected = False
+```go
+// internal/brain/mcp_client.go
 
-    async def connect(self) -> None:
-        """
-        1. Start MCP client (spawns gbrain serve)
-        2. Discover tools via tools/list
-        3. Register each tool in Klawmbing's ToolRegistry
-        4. Set self.connected = True
-        5. Log: "GBrain connected: {N} tools available"
-        """
-        await self.mcp.start()
-        tools = await self.mcp.list_tools()
+type MCPClient struct {
+    cmd       *exec.Cmd
+    stdin     io.WriteCloser      // pipe to gbrain's stdin
+    responses sync.Map            // map[int64]chan json.RawMessage
+    nextID    atomic.Int64        // monotonically increasing request IDs
+    mu        sync.Mutex          // guards cmd and stdin reassignment on restart
+    connected bool                // true after successful initialize handshake
+}
 
-        for tool in tools:
-            self.registry.register(
-                name=f"gbrain_{tool['name']}",  # Prefix to namespace
-                description=tool['description'],
-                input_schema=tool['inputSchema'],
-                handler=self._make_handler(tool['name'])
-            )
+// Start spawns the subprocess, wires stdin/stdout pipes, launches the reader
+// goroutine, and sends the MCP initialize handshake.
+// Returns an error if the process cannot be started or initialize fails.
+func (c *MCPClient) Start(ctx context.Context) error
 
-        self.connected = True
-        logger.info(f"GBrain connected: {len(tools)} tools available")
+// Stop sends an MCP shutdown notification and terminates the subprocess.
+// It is idempotent.
+func (c *MCPClient) Stop() error
 
-    def _make_handler(self, tool_name: str) -> Callable:
-        """Create a handler closure that calls MCP for a specific tool."""
-        async def handler(input: dict) -> str:
-            if not self.connected:
-                return "Error: Brain is disconnected"
-            return await self.mcp.call_tool(tool_name, input)
-        return handler
+// ListTools calls tools/list and returns the discovered tool definitions.
+func (c *MCPClient) ListTools(ctx context.Context) ([]ToolDefinition, error)
 
-    async def disconnect(self) -> None:
-        """Stop MCP client, mark as disconnected."""
+// CallTool calls tools/call for the named tool with the given JSON arguments.
+// Returns the raw JSON result from GBrain.
+func (c *MCPClient) CallTool(ctx context.Context, name string, args json.RawMessage) (json.RawMessage, error)
 
-    async def monitor(self) -> None:
-        """
-        Background task: health-check every 30s.
-        If unresponsive, attempt restart.
-        If restart fails 3 times, mark as permanently disconnected.
-        """
+// sendRequest marshals and writes a JSON-RPC 2.0 request to stdin, registers a
+// response channel in c.responses, and blocks until the reader goroutine delivers
+// the matching response or ctx is cancelled.
+func (c *MCPClient) sendRequest(ctx context.Context, method string, params json.RawMessage) (json.RawMessage, error)
+
+// readLoop is launched as a goroutine by Start. It runs a bufio.Scanner over the
+// subprocess stdout. Each line is unmarshaled as a jsonrpcResponse; the response
+// is delivered to the channel registered under its ID in c.responses. If the
+// scanner returns an error (subprocess exited), readLoop returns so the health
+// monitor can attempt a restart.
+func (c *MCPClient) readLoop(stdout io.Reader)
 ```
 
-### 6.4 Expected GBrain MCP Tools
+**Concurrency model:**
 
-Based on GBrain's documentation, the following tools will be available after connection. Klawmbing registers all of them but the most critical for "hello world" are marked:
+```
+ caller goroutine                    readLoop goroutine
+ ──────────────────                  ──────────────────
+ id  := nextID.Add(1)
+ ch  := make(chan json.RawMessage, 1)
+ responses.Store(id, ch)
+ write request to stdin ──────────► gbrain process
+                                     gbrain process ──► stdout line
+                        ◄────────── scanner reads line
+                                     unmarshal response
+                                     responses.Load(id) → ch
+                                     ch <- raw result
+ raw := <-ch  ◄─────────────────────
+ responses.Delete(id)
+```
+
+### 6.4 GBrainBridge
+
+`GBrainBridge` owns tool registration and the health-monitoring goroutine. It is the public API that the runtime uses.
+
+```go
+// internal/brain/bridge.go
+
+type GBrainBridge struct {
+    client          *MCPClient
+    registry        *tools.ToolRegistry
+    config          BrainConfig
+    restartCount    int
+    mu              sync.Mutex   // guards restartCount and available
+    available       bool
+}
+
+// Start starts the MCP client, discovers tools, registers them in the tool
+// registry, then launches the health-monitor goroutine. Returns an error only
+// if the subprocess cannot be started at all; a failed tool discovery is logged
+// and treated as degraded mode, not a fatal error.
+func (b *GBrainBridge) Start(ctx context.Context) error
+
+// IsAvailable returns true if GBrain is connected and healthy.
+func (b *GBrainBridge) IsAvailable() bool
+
+// Stop gracefully shuts down the MCP client and cancels the health monitor.
+func (b *GBrainBridge) Stop() error
+
+// discoverAndRegister calls ListTools and registers each tool in the registry
+// under the "gbrain_" prefix. Called at startup and again after each restart.
+func (b *GBrainBridge) discoverAndRegister(ctx context.Context) error
+
+// makeHandler returns a ToolRegistry handler closure for a single GBrain tool.
+// The closure checks availability at call time; if unavailable it returns
+// ("", ErrBrainUnavailable) so the tool registry can surface an error string
+// to the LLM without panicking.
+func (b *GBrainBridge) makeHandler(toolName string) func(ctx context.Context, args json.RawMessage) (json.RawMessage, error)
+
+// healthMonitor runs in a goroutine. Every HealthCheckInterval seconds it calls
+// tools/list as a liveness probe. On failure it calls attemptRestart.
+func (b *GBrainBridge) healthMonitor(ctx context.Context)
+
+// attemptRestart tries to restart the subprocess up to MaxRestartAttempts times
+// with exponential backoff (1s, 2s, 4s). On success it calls discoverAndRegister
+// and marks available = true. On permanent failure it logs a warning and marks
+// available = false (degraded mode).
+func (b *GBrainBridge) attemptRestart(ctx context.Context)
+```
+
+**Health monitor goroutine sketch:**
+
+```go
+func (b *GBrainBridge) healthMonitor(ctx context.Context) {
+    ticker := time.NewTicker(time.Duration(b.config.HealthCheckInterval) * time.Second)
+    defer ticker.Stop()
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            _, err := b.client.ListTools(ctx)
+            if err != nil {
+                slog.Warn("GBrain health check failed", "err", err)
+                b.mu.Lock()
+                b.available = false
+                b.mu.Unlock()
+                b.attemptRestart(ctx)
+            }
+        }
+    }
+}
+```
+
+**Restart with exponential backoff:**
+
+```go
+func (b *GBrainBridge) attemptRestart(ctx context.Context) {
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    for attempt := 1; attempt <= b.config.MaxRestartAttempts; attempt++ {
+        backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+        select {
+        case <-ctx.Done():
+            return
+        case <-time.After(backoff):
+        }
+        _ = b.client.Stop()
+        if err := b.client.Start(ctx); err != nil {
+            slog.Warn("GBrain restart failed", "attempt", attempt, "err", err)
+            continue
+        }
+        if err := b.discoverAndRegister(ctx); err != nil {
+            slog.Warn("GBrain tool discovery failed after restart", "attempt", attempt, "err", err)
+            continue
+        }
+        b.available = true
+        b.restartCount = 0
+        slog.Info("GBrain reconnected", "attempt", attempt)
+        return
+    }
+    slog.Error("GBrain permanently disconnected after max restart attempts",
+        "max", b.config.MaxRestartAttempts)
+}
+```
+
+### 6.5 Tool Registry Integration
+
+`GBrainBridge.discoverAndRegister` iterates over `ListTools` results and calls `registry.Register` for each tool:
+
+```go
+for _, def := range toolDefs {
+    registeredName := b.config.ToolPrefix + "_" + def.Name  // e.g. "gbrain_search"
+    capturedName   := def.Name                              // capture for closure
+    b.registry.Register(tools.ToolSpec{
+        Name:        registeredName,
+        Description: def.Description,
+        InputSchema: def.InputSchema,
+        Handler:     b.makeHandler(capturedName),
+    })
+}
+slog.Info("GBrain connected", "tools", len(toolDefs))
+```
+
+The `makeHandler` closure returns `ErrBrainUnavailable` (not a panic) when `IsAvailable()` is false, so the tool registry converts it to an error string that the LLM receives and handles gracefully.
+
+### 6.6 Expected GBrain MCP Tools
+
+Tools are discovered dynamically via `tools/list` — Klawmbing hardcodes nothing. The table below is informational only, based on GBrain v0.12 documentation:
 
 | Tool | Purpose | Hello World? |
 |------|---------|-------------|
@@ -219,36 +344,50 @@ Based on GBrain's documentation, the following tools will be available after con
 | `list_pages` | List pages by type or tag | No |
 | `recent` | List recently modified pages | No |
 
-**Note:** The actual tool names and schemas will be discovered dynamically via `tools/list`. The table above is based on GBrain v0.12 documentation and may differ. The dynamic discovery pattern means Klawmbing doesn't hardcode any GBrain-specific knowledge — it adapts to whatever tools GBrain exposes.
-
-### 6.5 Degraded Mode (Brain Disconnected)
+### 6.7 Degraded Mode (Brain Disconnected)
 
 If GBrain is unavailable:
-1. All `gbrain_*` tool handlers return `"Error: Brain is disconnected. Operating without memory."`
-2. The LLM receives this error and can explain to the user that memory is unavailable
-3. Klawmbing continues processing messages normally — just without brain-backed context
-4. A warning is logged every 60 seconds: "GBrain disconnected — operating in degraded mode"
-5. Background monitor attempts to reconnect every 30 seconds
+1. `makeHandler` closures return `("", ErrBrainUnavailable)` — the tool registry converts this to an error string: `"Error: Brain is disconnected. Operating without memory."`
+2. The LLM receives this error string and explains to the user that memory is unavailable
+3. Klawmbing continues processing messages — just without brain-backed context
+4. `slog.Warn` is emitted every 60 seconds: "GBrain disconnected — operating in degraded mode"
+5. The health-monitor goroutine continues attempting reconnect every `HealthCheckInterval` seconds
 
 ---
 
-## 7. Configuration
+## 7. File Layout
+
+```
+internal/
+└── brain/
+    ├── bridge.go       // GBrainBridge — lifecycle, health monitor, registration
+    ├── mcp_client.go   // MCPClient — subprocess, JSON-RPC, reader goroutine
+    └── types.go        // ToolDefinition, BrainConfig, ErrBrainUnavailable, jsonrpc types
+```
+
+GBrainBridge is constructed by the runtime (`core/runtime.go`) during startup and wired into the tool registry. It exposes no HTTP handlers of its own.
+
+---
+
+## 8. Configuration
 
 ```toml
 [brain]
-enabled = true
-mcp_transport = "stdio"                   # Only stdio supported in Phase 1
-gbrain_command = "gbrain"                 # Command to run (must be in PATH)
-gbrain_args = ["serve"]                   # Arguments
-gbrain_working_dir = "~/brain"            # Working directory for gbrain
-health_check_interval_s = 30              # How often to check health
-max_restart_attempts = 3                  # Before giving up
-tool_prefix = "gbrain"                    # Prefix for registered tool names
+enabled                  = true
+mcp_transport            = "stdio"        # Only stdio supported in Phase 1
+gbrain_command           = "gbrain"       # Must be in PATH
+gbrain_args              = ["serve"]
+gbrain_working_dir       = "~/brain"
+health_check_interval_s  = 30
+max_restart_attempts     = 3
+tool_prefix              = "gbrain"
 ```
+
+Config is parsed by the PRD-01 config loader into `BrainConfig` via `github.com/BurntSushi/toml`. Fail fast on startup if `gbrain_command` is empty when `enabled = true`.
 
 ---
 
-## 8. Setup Prerequisites
+## 9. Setup Prerequisites
 
 Before Klawmbing can connect to GBrain, the operator must:
 
@@ -280,21 +419,22 @@ Before Klawmbing can connect to GBrain, the operator must:
 
 ---
 
-## 9. Error Handling
+## 10. Error Handling
 
 | Error | Handling | User-facing |
 |-------|----------|-------------|
-| GBrain not installed | Startup warning, brain disabled | "Brain unavailable — memory features disabled" |
-| GBrain process crashes | Auto-restart (up to 3 attempts) | Brief pause, then resumes. If all retries fail: "Brain disconnected" |
-| MCP request timeout (>10s) | Cancel request, return error to LLM | LLM explains "brain query timed out" |
-| Invalid tool response from GBrain | Log error, return error string to LLM | LLM handles gracefully |
-| Brain data directory missing | Startup error, suggest `gbrain init` | "Brain directory ~/brain not found. Run: gbrain init" |
+| GBrain not installed / not in PATH | `exec.LookPath` fails at startup; brain disabled, warning logged | "Brain unavailable — memory features disabled" |
+| GBrain process crashes | `readLoop` exits; health monitor triggers `attemptRestart` (up to 3 times) | Brief pause, then resumes. If all retries fail: "Brain disconnected" |
+| MCP request timeout (>10s) | `ctx` deadline exceeded in `sendRequest`; channel cleaned up via `responses.Delete`; error returned to caller | LLM receives "brain query timed out" error string |
+| Invalid JSON from GBrain stdout | `json.Unmarshal` error in `readLoop`; line is logged and skipped; no in-flight request is resolved | Silent recovery; if all requests time out, health check will detect the problem |
+| Brain data directory missing | `gbrain serve` exits immediately; `Start` returns error | "Brain directory ~/brain not found. Run: gbrain init" |
+| Response channel leak on caller cancel | `sendRequest` defers `responses.Delete(id)` so the orphaned channel is always removed | None — internal cleanup |
 
 ---
 
-## 10. Acceptance Criteria
+## 11. Acceptance Criteria
 
-- [ ] `gbrain serve` is started automatically when Klawmbing starts (if brain.enabled = true)
+- [ ] `gbrain serve` is started automatically when Klawmbing starts (if `brain.enabled = true`)
 - [ ] Startup log shows "GBrain connected: N tools available" with actual tool count
 - [ ] Operator asks "What do you know about X?" → agent invokes `gbrain_search` → returns results
 - [ ] Operator says "Remember that Y" → agent invokes `gbrain_put` → confirms stored
@@ -302,10 +442,12 @@ Before Klawmbing can connect to GBrain, the operator must:
 - [ ] Killing the gbrain process triggers auto-restart within 30s
 - [ ] After 3 failed restarts, degraded mode is entered with clear user notification
 - [ ] With brain disabled in config, Klawmbing starts and operates without brain tools
+- [ ] Concurrent tool calls from a single agent turn are handled correctly (no response misrouting)
+- [ ] Cancelling a context mid-request does not leak the response channel
 
 ---
 
-## 11. Open Questions
+## 12. Open Questions
 
 | ID | Question | Default |
 |----|----------|---------|
@@ -314,3 +456,4 @@ Before Klawmbing can connect to GBrain, the operator must:
 | TODO-B03 | Tool name collision: if GBrain exposes a tool called "search" and we later add a web search tool also called "search," they'll collide. The prefix (`gbrain_search`) prevents this, but is the prefix the right approach? | Yes, prefix all GBrain tools with `gbrain_`. Consistent, unambiguous, no collision risk. |
 | TODO-B04 | Should Klawmbing always include brain context in the system prompt (pre-fetch relevant pages), or let the LLM decide when to search? | Let the LLM decide (tool call). Pre-fetching adds latency and tokens to every message. The LLM is good at deciding when it needs context. Revisit if retrieval quality is poor. |
 | TODO-B05 | GBrain brain directory: `~/brain/` or `~/.klawmbing/brain/`? Separate lifecycle vs co-located management. | `~/brain/` — the brain has its own lifecycle, independent of the claw runtime. Multiple claws could theoretically share a brain. |
+| TODO-B06 | Should `readLoop` log and skip unrecognized JSON lines (e.g. GBrain startup banners on stderr that bleed into stdout), or treat them as fatal? | Log and skip. GBrain may emit diagnostic lines; the reader should be tolerant. Validate that the `id` field exists before routing. |

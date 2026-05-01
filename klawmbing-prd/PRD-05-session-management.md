@@ -1,9 +1,10 @@
 # PRD-05: Session Management & Persistence
 
-**Status:** Draft v1.0
+**Status:** Draft v2.0 (Go)
 **Parent:** PRD-00 (Klawmbing Master PRD)
 **Author:** Dandi
 **Created:** April 26, 2026
+**Revised:** May 1, 2026
 **Dependencies:** PRD-01 (Core Runtime), PRD-02 (Channel Adapters — session IDs)
 **Estimated Effort:** 2-3 days
 
@@ -35,7 +36,7 @@ This PRD covers:
 - Session compaction / summarization (Phase 2 — requires memory flush to brain first)
 - Memory flush / fact extraction from sessions (Phase 2)
 - Multi-session management (switching between sessions in one chat)
-- Session sharing between adapters (CLI session ≠ Telegram session)
+- Session sharing between adapters (CLI session != Telegram session)
 - Session encryption
 
 ---
@@ -44,8 +45,8 @@ This PRD covers:
 
 | ID | Story | Acceptance Criteria |
 |----|-------|-------------------|
-| US-P01 | As an operator, I send multiple messages and the agent remembers what I said earlier in the conversation | Message 1: "Our database is Postgres 16." Message 5: "What database are we using?" → "Postgres 16." |
-| US-P02 | As an operator, I restart Klawmbing and my conversation context is preserved | After restart, ask "What did I just tell you about the database?" → Agent recalls from loaded session. |
+| US-P01 | As an operator, I send multiple messages and the agent remembers what I said earlier in the conversation | Message 1: "Our database is Postgres 16." Message 5: "What database are we using?" -> "Postgres 16." |
+| US-P02 | As an operator, I restart Klawmbing and my conversation context is preserved | After restart, ask "What did I just tell you about the database?" -> Agent recalls from loaded session. |
 | US-P03 | As an operator, my Telegram session and CLI session are independent | Facts shared in CLI don't appear in Telegram session history (they may appear via brain if stored). |
 | US-P04 | As a developer, I can inspect a session file to see the full conversation history | JSONL file contains human-readable entries with role, content, timestamp, and tool calls. |
 | US-P05 | As a developer, post-turn hooks run reliably after every response | Hook logs confirm execution. If a hook fails, the error is logged but doesn't affect the user response. |
@@ -56,102 +57,144 @@ This PRD covers:
 
 ### 5.1 Session Data Model
 
-```python
-@dataclass
-class SessionTurn:
-    """A single turn in a conversation (user message + assistant response)."""
-    turn_id: str                    # UUID
-    timestamp: datetime
-    user_message: Message           # Incoming message
-    assistant_response: str         # Agent's text response
-    tool_calls: list[ToolCall]      # Tools invoked during this turn
-    tool_results: list[ToolResult]  # Results from tool invocations
-    token_usage: TokenUsage         # Tokens consumed
-    skill_used: str | None          # Which skill was resolved (or None)
-    latency_ms: int                 # End-to-end latency
+```go
+// core/types.go
 
-@dataclass
-class Session:
-    """A conversation session with persistent state."""
-    session_id: str                 # e.g., "main:telegram:123456789"
-    created_at: datetime
-    updated_at: datetime
-    turns: list[SessionTurn]        # Full conversation history
-    metadata: dict                  # Arbitrary session metadata
-    compacted_summary: str | None   # Summary of compacted turns (Phase 2)
+// TokenUsage mirrors the Anthropic API usage block.
+type TokenUsage struct {
+    InputTokens      int `json:"input_tokens"`
+    OutputTokens     int `json:"output_tokens"`
+    CacheReadTokens  int `json:"cache_read_tokens"`
+    CacheWriteTokens int `json:"cache_write_tokens"`
+}
 
-    def to_messages(self) -> list[dict]:
-        """
-        Convert session history to Claude API message format.
-        Returns list of {"role": "user"/"assistant", "content": "..."} dicts.
-        Used by the LLM caller to provide conversation context.
-        """
+// ToolCallRecord is a single tool invocation within a turn.
+// Input is stored as raw JSON so the original structure is preserved without
+// a round-trip through Go types. Output is truncated to 500 chars before
+// being written to the session file (full output lives in tool-calls.jsonl).
+type ToolCallRecord struct {
+    Name       string          `json:"name"`
+    Input      json.RawMessage `json:"input"`
+    Output     string          `json:"output"`
+    DurationMs int64           `json:"duration_ms"`
+}
 
-    def add_turn(self, turn: SessionTurn) -> None:
-        """Append a turn and update updated_at."""
+// SessionTurn is one complete request/response cycle.
+type SessionTurn struct {
+    TurnID            string           `json:"turn_id"`             // UUID v4
+    Timestamp         time.Time        `json:"timestamp"`           // UTC, RFC3339
+    UserMessage       string           `json:"user_message"`
+    AssistantResponse string           `json:"assistant_response"`
+    ToolCalls         []ToolCallRecord `json:"tool_calls,omitempty"`
+    TokenUsage        TokenUsage       `json:"token_usage"`
+    SkillUsed         string           `json:"skill_used,omitempty"` // empty = general mode
+    LatencyMs         int64            `json:"latency_ms"`
+}
 
-    @property
-    def turn_count(self) -> int:
-        """Number of turns in this session."""
+// Session is the in-memory representation of one conversation thread.
+// mu is not serialised — it guards Turns and UpdatedAt for concurrent access
+// from the main goroutine (write) and background hook goroutines (read).
+type Session struct {
+    SessionID string        `json:"session_id"`  // e.g. "main:telegram:123456789"
+    CreatedAt time.Time     `json:"created_at"`
+    UpdatedAt time.Time     `json:"updated_at"`
+    Turns     []SessionTurn `json:"turns"`
+    mu        sync.RWMutex  // not serialised
+}
 
-    @property
-    def is_compaction_needed(self) -> bool:
-        """True if turn count exceeds threshold (Phase 2)."""
+// TurnCount returns the number of turns under a read lock.
+func (s *Session) TurnCount() int {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+    return len(s.Turns)
+}
+
+// IsCold returns true if this is a brand-new session or the last activity
+// was more than threshold ago. Used by hooks to decide whether to skip
+// expensive operations on idle sessions.
+func (s *Session) IsCold(threshold time.Duration) bool {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+    return len(s.Turns) == 0 || time.Since(s.UpdatedAt) > threshold
+}
+
+// AddTurn appends a turn and advances UpdatedAt. Called from the main loop
+// after the LLM response is complete; the write lock prevents hook goroutines
+// from reading a partial slice.
+func (s *Session) AddTurn(turn SessionTurn) {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    s.Turns = append(s.Turns, turn)
+    s.UpdatedAt = time.Now().UTC()
+}
 ```
+
+**Why `json.RawMessage` for `ToolCallRecord.Input`:** Tool inputs arrive from the Anthropic SDK as `json.RawMessage` already. Re-encoding them through a `map[string]any` would lose field order and number precision. Keeping them raw avoids that and is cheaper.
+
+**Why `sync.RWMutex` on the struct, not a global lock:** Each `Session` has its own mutex. Concurrent hook goroutines can safely `RLock` different sessions simultaneously. Only a single write per turn (from `AddTurn`) holds a write lock.
 
 ### 5.2 Session Manager
 
-```python
-class SessionManager:
-    """
-    Manages session lifecycle: creation, loading, persistence, resolution.
-    """
+```go
+// core/session.go
 
-    def __init__(self, config: SessionConfig):
-        self.storage_dir = config.storage_dir
-        self.sessions: dict[str, Session] = {}  # In-memory cache
-        self.max_turns_in_context = config.max_turns_in_context  # default: 50
+// SessionConfig is the parsed [session] block from config.toml.
+type SessionConfig struct {
+    StorageDir              string `toml:"storage_dir"`               // relative to ~/.klawmbing/
+    MaxTurnsInContext       int    `toml:"max_turns_in_context"`       // default: 50
+    MaxTurnsBeforeCompaction int   `toml:"max_turns_before_compaction"` // Phase 2; default: 30
+    MaxFileSizeMB           int    `toml:"max_file_size_mb"`           // warn threshold; default: 10
+    MaxContextTokens        int    `toml:"max_context_tokens"`         // Tier 2 token budget; default: 40000
+    LoadOnStartup           bool   `toml:"load_on_startup"`            // default: true
+}
 
-    def resolve_or_create(self, message: Message) -> Session:
-        """
-        Get the existing session for this message's session_id,
-        or create a new one if none exists.
+// SessionManager owns session lifecycle: creation, loading, caching, and persistence.
+// sessions is a sync.Map (not a plain map + mutex) because reads vastly outnumber
+// writes and sync.Map is optimised for that pattern.
+// fileHandles caches one open *os.File per session to avoid open/close overhead
+// on every turn append.
+type SessionManager struct {
+    storageDir  string
+    config      SessionConfig
+    sessions    sync.Map // map[string]*Session
+    fileHandles sync.Map // map[string]*os.File — closed on Shutdown()
+    logger      *slog.Logger
+}
 
-        1. Check in-memory cache
-        2. If not cached, try loading from disk
-        3. If not on disk, create new session
-        """
+func NewSessionManager(cfg SessionConfig, logger *slog.Logger) (*SessionManager, error)
 
-    def get_context_messages(self, session: Session) -> list[dict]:
-        """
-        Get the message history for the LLM context.
+// ResolveOrCreate returns the live *Session for sessionID.
+// Resolution order:
+//   1. In-memory cache (sync.Map lookup — no lock contention)
+//   2. Disk (JSONL file) — loaded and cached if found
+//   3. New session — created, cached, but NOT written to disk until first Persist()
+func (m *SessionManager) ResolveOrCreate(ctx context.Context, sessionID string) (*Session, error)
 
-        Returns the most recent N turns as Claude API message format.
-        If session has a compacted_summary, prepend it as context.
+// Persist appends turn to the session's JSONL file.
+// The file handle is kept open (cached in fileHandles) so the OS doesn't pay
+// open/stat/close on every turn. The write is: json.Marshal(turn) + "\n".
+// The file is opened with os.O_APPEND|os.O_CREATE|os.O_WRONLY and 0644 perms.
+// If the file exceeds MaxFileSizeMB after the write, a warning is logged.
+func (m *SessionManager) Persist(session *Session, turn SessionTurn) error
 
-        Phase 1: Return ALL turns (up to max_turns_in_context).
-        Phase 2: Return compacted_summary + recent turns.
-        """
+// LoadAll reads every *.jsonl file in storageDir and populates the in-memory
+// cache. Called once at startup before any adapter begins accepting messages.
+// Corrupt lines are skipped with a slog.Warn; the rest of the file is loaded.
+// Logs: "Loaded N sessions (M total turns)" on success.
+func (m *SessionManager) LoadAll(ctx context.Context) error
 
-    async def persist(self, session: Session) -> None:
-        """
-        Write the session to a JSONL file.
-        Each call appends the latest turn (not the full history).
-        On first persist, creates the file.
-        """
+// GetContextTurns returns the slice of turns to send to the LLM.
+// Phase 1: newest MaxTurnsInContext turns (simple slice from the tail).
+// Phase 2 (Tier 2 token budget): walks turns newest-to-oldest, accumulating
+//   estimated tokens via len(turnJSON)/4 heuristic, stops when MaxContextTokens hit.
+// Always acquires session.mu.RLock().
+func (m *SessionManager) GetContextTurns(session *Session) []SessionTurn
 
-    def load_from_disk(self, session_id: str) -> Session | None:
-        """
-        Load a session from its JSONL file.
-        Returns None if file doesn't exist.
-        """
-
-    def load_all_active(self) -> dict[str, Session]:
-        """
-        On startup, load the most recently modified session file
-        per unique session_id. Cache in memory.
-        """
+// Shutdown closes all cached file handles. Called from the runtime's cleanup path.
+func (m *SessionManager) Shutdown()
 ```
+
+**File handle cache rationale:** A solo-operator deployment typically has 2-3 active sessions (CLI + Telegram DM). Keeping file handles open is safe and eliminates repeated `open` syscalls per turn. On shutdown, `Shutdown()` iterates `fileHandles` and calls `f.Close()` on each.
 
 ### 5.3 JSONL File Format
 
@@ -159,273 +202,360 @@ Each session is stored as a JSONL file: one JSON object per line.
 
 **File location:** `~/.klawmbing/sessions/{session_id_sanitized}.jsonl`
 
-Session ID sanitization: replace `:` with `_` → `main_telegram_123456789.jsonl`
+Session ID sanitization: `strings.ReplaceAll(sessionID, ":", "_")` — e.g. `main_telegram_123456789.jsonl`
 
-**JSONL line format:**
+**First line — session header (written once on session creation):**
 
 ```json
-{"type": "session_created", "session_id": "main:telegram:123456789", "created_at": "2026-04-26T14:00:00Z"}
+{"type":"session_created","session_id":"main:telegram:123456789","created_at":"2026-04-26T14:00:00Z"}
 ```
 
+**Subsequent lines — one per turn:**
+
 ```json
-{
-  "type": "turn",
-  "turn_id": "uuid-here",
-  "timestamp": "2026-04-26T14:00:05Z",
-  "user": {
-    "content": "Remember that our database port is 5433",
-    "channel": "telegram",
-    "sender": "123456789"
-  },
-  "assistant": {
-    "content": "Stored. Your database runs on port 5433.",
-    "skill_used": "note-capture",
-    "tool_calls": [
-      {
-        "name": "gbrain_put",
-        "input": {"title": "Database Configuration", "content": "..."},
-        "output": "Page created: Database Configuration",
-        "duration_ms": 230
-      }
-    ]
-  },
-  "token_usage": {"input": 1240, "output": 45, "cache_read": 800},
-  "latency_ms": 2100
-}
+{"turn_id":"a1b2c3d4-...","timestamp":"2026-04-26T14:00:05Z","user_message":"Remember that our database port is 5433","assistant_response":"Stored. Your database runs on port 5433.","tool_calls":[{"name":"gbrain_put","input":{"title":"Database Configuration","content":"..."},"output":"Page created: Database Configuration","duration_ms":230}],"token_usage":{"input_tokens":1240,"output_tokens":45,"cache_read_tokens":800,"cache_write_tokens":0},"skill_used":"note-capture","latency_ms":2100}
 ```
 
 **Design decisions:**
-- Append-only: each turn is one line, appended to the file. Never rewrite the entire file.
-- Human-readable: pretty enough to read with `cat` or `jq`.
-- Crash-safe: if the process dies mid-turn, the file has all completed turns. The incomplete turn is simply lost.
-- Size guard: log a warning if any session file exceeds 10MB (Phase 2: trigger compaction).
+
+- Append-only: each turn is one line appended via the cached file handle. The file is never rewritten.
+- No pretty-printing in the file: `json.Marshal` (compact) keeps lines short and `jq` handles formatting at read time.
+- Crash-safe: if the process dies mid-turn, completed turns are intact. The in-flight turn is lost; no partial lines are written because `Write` is atomic for small payloads under 4KB (OS guarantee on POSIX).
+- Size guard: after each `Persist`, check `f.Stat().Size()` and log `slog.Warn` if it exceeds `MaxFileSizeMB * 1024 * 1024`. No action taken in Phase 1.
+- LoadAll skips lines where `json.Unmarshal` fails with `slog.Warn("corrupt jsonl line", "file", path, "line", n, "err", err)`.
 
 ### 5.4 Session Resolution
 
-Session IDs are determined by the channel adapter (defined in PRD-02):
+Session IDs are set by the channel adapter (PRD-02). The manager is ID-agnostic.
 
 | Source | Session ID | Behavior |
 |--------|-----------|----------|
 | CLI | `main:cli:local` | Always the same session. Resumes on restart. |
 | Telegram DM (operator) | `main:telegram:{user_id}` | One persistent session per operator account. |
-| Telegram group (future) | `group:telegram:{chat_id}` | One session per group. Sandboxed. |
+| Telegram group (future) | `group:telegram:{chat_id}` | One session per group. Sandboxed tools. |
 | Discord DM (future) | `main:discord:{user_id}` | One session per user. |
 
-**Resolution logic:**
-```python
-def resolve_or_create(self, message: Message) -> Session:
-    session_id = message.session_id  # Set by adapter
+**Prefix semantics:**
+- `main:` prefix = full tool access (all registered tools available)
+- `group:` prefix = sandboxed (Phase 2: gbrain_* tools only, no shell/code execution)
 
-    # Check memory cache
-    if session_id in self.sessions:
-        return self.sessions[session_id]
+The prefix is interpreted by the tool registry and context assembler (PRD-01, PRD-04), not by the session manager itself. The session manager stores and returns sessions without restricting tool access.
 
-    # Try loading from disk
-    session = self.load_from_disk(session_id)
-    if session:
-        self.sessions[session_id] = session
-        logger.info(f"Session loaded from disk: {session_id} ({session.turn_count} turns)")
-        return session
+**Resolution logic (Go):**
 
-    # Create new session
-    session = Session(
-        session_id=session_id,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        turns=[],
-        metadata={},
-        compacted_summary=None
-    )
-    self.sessions[session_id] = session
-    logger.info(f"New session created: {session_id}")
-    return session
+```go
+func (m *SessionManager) ResolveOrCreate(ctx context.Context, sessionID string) (*Session, error) {
+    // 1. In-memory cache hit — no lock needed (sync.Map)
+    if v, ok := m.sessions.Load(sessionID); ok {
+        return v.(*Session), nil
+    }
+
+    // 2. Load from disk
+    session, err := m.loadFromDisk(sessionID)
+    if err != nil {
+        return nil, fmt.Errorf("loading session %s: %w", sessionID, err)
+    }
+    if session != nil {
+        m.sessions.Store(sessionID, session)
+        m.logger.InfoContext(ctx, "session loaded from disk",
+            "session_id", sessionID,
+            "turns", session.TurnCount())
+        return session, nil
+    }
+
+    // 3. Create new session
+    now := time.Now().UTC()
+    session = &Session{
+        SessionID: sessionID,
+        CreatedAt: now,
+        UpdatedAt: now,
+        Turns:     make([]SessionTurn, 0, 8),
+    }
+    // Store with LoadOrStore to handle a race where two goroutines create
+    // the same session ID simultaneously (e.g. rapid Telegram retries).
+    actual, loaded := m.sessions.LoadOrStore(sessionID, session)
+    if loaded {
+        return actual.(*Session), nil
+    }
+    m.logger.InfoContext(ctx, "new session created", "session_id", sessionID)
+    return session, nil
+}
 ```
 
 ### 5.5 Context Window Management
 
-The `get_context_messages` method converts session history to Claude API messages. It needs to respect context window limits.
+`GetContextTurns` converts session history into the slice passed to the LLM caller. The LLM caller (PRD-01) converts turns to Claude API `messages` format.
 
-**Phase 1 strategy (simple):**
-- Include the most recent `max_turns_in_context` turns (default: 50)
-- Each turn becomes a user message + assistant message pair
-- Tool calls are included as tool_use/tool_result content blocks
-- If turn count exceeds limit, silently drop oldest turns
+**Phase 1 — turn count limit (simple):**
 
-**Phase 2 strategy (compaction):**
-- When turn count exceeds `max_turns_before_compaction` (default: 30)
-- Run memory flush (extract facts to gbrain)
-- Summarize oldest 50% of turns into a paragraph
-- Store summary as `compacted_summary`
-- Delete raw turns that were summarized
-- Prepend summary to context on subsequent turns
+```go
+func (m *SessionManager) GetContextTurns(session *Session) []SessionTurn {
+    session.mu.RLock()
+    defer session.mu.RUnlock()
 
-```python
-def get_context_messages(self, session: Session) -> list[dict]:
-    messages = []
-
-    # Prepend compacted summary if it exists
-    if session.compacted_summary:
-        messages.append({
-            "role": "user",
-            "content": f"[Previous conversation summary: {session.compacted_summary}]"
-        })
-        messages.append({
-            "role": "assistant",
-            "content": "I understand the context from our previous conversation. How can I help?"
-        })
-
-    # Add recent turns
-    recent_turns = session.turns[-self.max_turns_in_context:]
-    for turn in recent_turns:
-        messages.append({"role": "user", "content": turn.user_message.content})
-
-        # If there were tool calls, include them properly
-        if turn.tool_calls:
-            # Build assistant content with tool_use blocks
-            assistant_content = self._build_tool_use_messages(turn)
-            messages.extend(assistant_content)
-        else:
-            messages.append({"role": "assistant", "content": turn.assistant_response})
-
-    return messages
+    if len(session.Turns) <= m.config.MaxTurnsInContext {
+        // Return a copy to avoid data races if the caller iterates while
+        // AddTurn runs concurrently.
+        result := make([]SessionTurn, len(session.Turns))
+        copy(result, session.Turns)
+        return result
+    }
+    start := len(session.Turns) - m.config.MaxTurnsInContext
+    result := make([]SessionTurn, m.config.MaxTurnsInContext)
+    copy(result, session.Turns[start:])
+    return result
+}
 ```
+
+**Phase 2 (Tier 2) — token budget:**
+
+Walk turns newest-to-oldest. Estimate tokens via `len(turnJSON)/4` (rough chars-to-tokens heuristic). Stop when the running total would exceed `MaxContextTokens`. Return the accumulated slice in chronological order.
+
+```go
+// Phase 2 variant — replaces the Phase 1 implementation above.
+func (m *SessionManager) GetContextTurns(session *Session) []SessionTurn {
+    session.mu.RLock()
+    defer session.mu.RUnlock()
+
+    budget := m.config.MaxContextTokens
+    selected := make([]SessionTurn, 0, m.config.MaxTurnsInContext)
+
+    for i := len(session.Turns) - 1; i >= 0; i-- {
+        b, _ := json.Marshal(session.Turns[i])
+        cost := len(b) / 4
+        if budget-cost < 0 {
+            break
+        }
+        budget -= cost
+        selected = append(selected, session.Turns[i])
+        if len(selected) >= m.config.MaxTurnsInContext {
+            break
+        }
+    }
+
+    // Reverse to restore chronological order.
+    slices.Reverse(selected)
+    return selected
+}
+```
+
+**Phase 2 compaction (triggered by hook, not by GetContextTurns):**
+
+When `session.TurnCount() > MaxTurnsBeforeCompaction`:
+1. Run memory flush: extract facts from oldest 50% of turns to gbrain (PRD-03).
+2. Summarise the flushed turns into a paragraph (Haiku call, ~12x cheaper).
+3. Prepend the summary as a synthetic exchange at the start of context — this is injected by the LLM caller, not stored as a real `SessionTurn`.
+4. Drop the raw turns that were summarised from `session.Turns`.
+5. Write a `{"type":"compaction","summary":"...","turns_compacted":N}` line to the JSONL file.
+
+The summary string lives in memory only (not on the `Session` struct in Phase 1). In Phase 2, add `CompactedSummary string` to `Session` and persist it in the compaction JSONL line.
 
 ### 5.6 Post-Turn Hooks
 
-Post-turn hooks are functions that execute after every agent response. They are fire-and-forget — failures in hooks do not affect the user-facing response.
+Post-turn hooks are functions that run after every agent response. They are fire-and-forget — failures never propagate to the main loop.
 
-```python
-class PostTurnHookManager:
-    """
-    Manages hooks that run after each agent turn.
-    Hooks are async functions that receive the session and the latest turn.
-    """
+```go
+// core/hooks.go
 
-    def __init__(self):
-        self.hooks: list[Callable] = []
+// HookFunc is the signature every hook must implement.
+type HookFunc func(ctx context.Context, session *Session, turn SessionTurn) error
 
-    def register(self, hook: Callable) -> None:
-        """Register a post-turn hook."""
+// RunHooks executes all hooks concurrently using errgroup.
+// The context has a 5-second deadline: hooks that exceed it are cancelled.
+// Errors are logged via slog.Error and discarded — the caller is never aware.
+func RunHooks(ctx context.Context, hooks []HookFunc, session *Session, turn SessionTurn) {
+    hookCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+    defer cancel()
 
-    async def execute_all(self, session: Session, turn: SessionTurn) -> None:
-        """
-        Run all hooks concurrently. Catch and log any errors.
-        Do not propagate exceptions — hooks must never break the main loop.
-        """
-        tasks = [self._safe_execute(hook, session, turn) for hook in self.hooks]
-        await asyncio.gather(*tasks)
-
-    async def _safe_execute(self, hook, session, turn):
-        try:
-            await hook(session, turn)
-        except Exception as e:
-            logger.error(f"Post-turn hook {hook.__name__} failed: {e}", exc_info=True)
+    g, gCtx := errgroup.WithContext(hookCtx)
+    for _, h := range hooks {
+        h := h // capture loop variable
+        g.Go(func() error {
+            if err := h(gCtx, session, turn); err != nil {
+                slog.ErrorContext(gCtx, "post-turn hook failed",
+                    "hook", runtime.FuncForPC(reflect.ValueOf(h).Pointer()).Name(),
+                    "session_id", session.SessionID,
+                    "turn_id", turn.TurnID,
+                    "err", err)
+            }
+            return nil // always nil — errors are logged, not returned
+        })
+    }
+    _ = g.Wait() // error is always nil by construction above
+}
 ```
+
+**Why `errgroup` instead of plain goroutines:** `errgroup` with a shared context ensures all hooks respect the 5-second deadline and the parent goroutine waits for all of them to finish before returning. Plain `go func()` would leak goroutines if the caller proceeds immediately.
 
 **Built-in hooks (Phase 1):**
 
-```python
-# Hook 1: Persist session to disk
-async def persist_session_hook(session: Session, turn: SessionTurn) -> None:
-    """Append the latest turn to the session's JSONL file."""
-    await session_manager.persist(session)
-
-# Hook 2: Log turn metrics
-async def log_metrics_hook(session: Session, turn: SessionTurn) -> None:
-    """Log token usage, latency, skill used, tool calls to tool-calls.jsonl."""
-    log_entry = {
-        "timestamp": turn.timestamp.isoformat(),
-        "session_id": session.session_id,
-        "turn_id": turn.turn_id,
-        "tokens": asdict(turn.token_usage),
-        "latency_ms": turn.latency_ms,
-        "skill_used": turn.skill_used,
-        "tool_call_count": len(turn.tool_calls),
+```go
+// PersistSessionHook appends the latest turn to the session's JSONL file.
+func PersistSessionHook(sm *SessionManager) HookFunc {
+    return func(ctx context.Context, session *Session, turn SessionTurn) error {
+        return sm.Persist(session, turn)
     }
-    append_jsonl("logs/tool-calls.jsonl", log_entry)
+}
+
+// LogMetricsHook appends a metrics record to logs/tool-calls.jsonl.
+// Uses the same append-only JSONL pattern as session files.
+func LogMetricsHook(logPath string) HookFunc {
+    // File handle opened once via sync.Once at construction time.
+    var (
+        once sync.Once
+        f    *os.File
+        fErr error
+    )
+    return func(ctx context.Context, session *Session, turn SessionTurn) error {
+        once.Do(func() {
+            f, fErr = os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+        })
+        if fErr != nil {
+            return fmt.Errorf("open metrics log: %w", fErr)
+        }
+
+        record := struct {
+            Timestamp     string     `json:"timestamp"`
+            SessionID     string     `json:"session_id"`
+            TurnID        string     `json:"turn_id"`
+            TokenUsage    TokenUsage `json:"token_usage"`
+            LatencyMs     int64      `json:"latency_ms"`
+            SkillUsed     string     `json:"skill_used,omitempty"`
+            ToolCallCount int        `json:"tool_call_count"`
+        }{
+            Timestamp:     turn.Timestamp.Format(time.RFC3339),
+            SessionID:     session.SessionID,
+            TurnID:        turn.TurnID,
+            TokenUsage:    turn.TokenUsage,
+            LatencyMs:     turn.LatencyMs,
+            SkillUsed:     turn.SkillUsed,
+            ToolCallCount: len(turn.ToolCalls),
+        }
+        line, err := json.Marshal(record)
+        if err != nil {
+            return err
+        }
+        line = append(line, '\n')
+        _, err = f.Write(line)
+        return err
+    }
+}
 ```
 
 **Future hooks (Phase 2):**
-```python
-# Hook 3: Memory flush (extract facts to brain)
-async def memory_flush_hook(session, turn):
-    """Extract structured facts from the turn and store in gbrain."""
 
-# Hook 4: Compaction check
-async def compaction_check_hook(session, turn):
-    """If turn count exceeds threshold, trigger compaction."""
+```go
+// MemoryFlushHook extracts structured facts from the turn and stores in gbrain.
+// Only fires when the session is not cold (recent activity with real content).
+func MemoryFlushHook(brainClient BrainClient) HookFunc
+
+// CompactionCheckHook triggers compaction when TurnCount() > MaxTurnsBeforeCompaction.
+// Compaction is a multi-step operation (flush -> summarise -> truncate Turns).
+func CompactionCheckHook(sm *SessionManager, brainClient BrainClient) HookFunc
 ```
 
 ---
 
 ## 6. Integration with Core Runtime (PRD-01)
 
-The `handle_message` method in runtime.py uses all components together:
+The `HandleMessage` method in `runtime.go` wires all components together:
 
-```python
-async def handle_message(self, message: Message) -> None:
-    """
-    The core loop — ties PRD-01 through PRD-05 together.
-    """
+```go
+// core/runtime.go
 
-    # 1. Session resolution (PRD-05)
-    session = self.session_manager.resolve_or_create(message)
+func (r *Runtime) HandleMessage(ctx context.Context, msg Message) error {
+    // 1. Session resolution (PRD-05)
+    session, err := r.sessionManager.ResolveOrCreate(ctx, msg.SessionID)
+    if err != nil {
+        return fmt.Errorf("resolve session: %w", err)
+    }
 
-    # 2. Context assembly (PRD-04)
-    context_messages = self.session_manager.get_context_messages(session)
-    system_prompt = self.context_assembler.assemble(
-        message=message,
-        session_context=session.compacted_summary,
-        brain_context=None  # Let LLM decide to search brain via tools
+    // 2. Context assembly (PRD-04)
+    contextTurns := r.sessionManager.GetContextTurns(session)
+    systemPrompt, err := r.contextAssembler.Assemble(ctx, msg, contextTurns)
+    if err != nil {
+        return fmt.Errorf("assemble context: %w", err)
+    }
+
+    // 3. Build Claude API messages from turn history + current user message
+    apiMessages := turnsToAPIMessages(contextTurns)
+    apiMessages = append(apiMessages, anthropic.UserMessage(msg.Content))
+
+    // 4. Call LLM with streaming (PRD-01)
+    start := time.Now()
+    var (
+        fullResponse string
+        toolCalls    []ToolCallRecord
+        tokenUsage   TokenUsage
     )
 
-    # 3. Append user message to context
-    context_messages.append({"role": "user", "content": message.content})
+    adapter := r.adapters[msg.Channel]
+    stream := r.llmCaller.Stream(ctx, LLMRequest{
+        Messages:     apiMessages,
+        SystemPrompt: systemPrompt,
+        Tools:        r.toolRegistry.Definitions(),
+    })
 
-    # 4. Call LLM with streaming (PRD-01)
-    full_response = ""
-    tool_calls = []
-    tool_results = []
-    start_time = time.monotonic()
+    for event := range stream.Events() {
+        switch e := event.(type) {
+        case TextDelta:
+            fullResponse += e.Text
+            adapter.SendStreamingToken(ctx, msg.SessionID, e.Text)
+        case ToolUseEvent:
+            rec, err := r.toolRegistry.Execute(ctx, e.ToolCall)
+            if err != nil {
+                slog.ErrorContext(ctx, "tool execution failed", "tool", e.ToolCall.Name, "err", err)
+            }
+            toolCalls = append(toolCalls, rec)
+        case FinalUsage:
+            tokenUsage = e.Usage
+        }
+    }
+    if err := stream.Err(); err != nil {
+        return fmt.Errorf("llm stream: %w", err)
+    }
 
-    adapter = self.get_adapter(message.channel)
+    // 5. Build turn record
+    turn := SessionTurn{
+        TurnID:            uuid.NewString(),
+        Timestamp:         time.Now().UTC(),
+        UserMessage:       msg.Content,
+        AssistantResponse: fullResponse,
+        ToolCalls:         toolCalls,
+        TokenUsage:        tokenUsage,
+        SkillUsed:         r.contextAssembler.LastSkillUsed(),
+        LatencyMs:         time.Since(start).Milliseconds(),
+    }
 
-    async for event in self.llm.call(
-        messages=context_messages,
-        system_prompt=system_prompt,
-        tools=self.tool_registry.get_tool_definitions()
-    ):
-        if isinstance(event, TextDelta):
-            # Stream token to adapter (PRD-02)
-            await adapter.send_streaming_token(message.session_id, event.text)
-            full_response += event.text
-        elif isinstance(event, ToolCallEvent):
-            tool_calls.append(event.tool_call)
-            result = await self.tool_registry.execute(event.tool_call)
-            tool_results.append(result)
-        elif isinstance(event, FinalResponse):
-            usage = event.usage
+    // 6. Commit turn to in-memory session
+    session.AddTurn(turn)
 
-    latency_ms = int((time.monotonic() - start_time) * 1000)
+    // 7. Post-turn hooks — fire and forget (PRD-05)
+    // RunHooks blocks for at most 5s; it never returns an error.
+    RunHooks(ctx, r.hooks, session, turn)
 
-    # 5. Create turn record
-    turn = SessionTurn(
-        turn_id=str(uuid4()),
-        timestamp=datetime.now(UTC),
-        user_message=message,
-        assistant_response=full_response,
-        tool_calls=tool_calls,
-        tool_results=tool_results,
-        token_usage=usage,
-        skill_used=self.context_assembler.last_skill_used,
-        latency_ms=latency_ms
-    )
+    return nil
+}
+```
 
-    # 6. Add turn to session
-    session.add_turn(turn)
+**`turnsToAPIMessages` helper:**
 
-    # 7. Post-turn hooks (PRD-05)
-    await self.post_turn_hooks.execute_all(session, turn)
+```go
+func turnsToAPIMessages(turns []SessionTurn) []anthropic.MessageParam {
+    msgs := make([]anthropic.MessageParam, 0, len(turns)*2)
+    for _, t := range turns {
+        msgs = append(msgs, anthropic.UserMessage(t.UserMessage))
+        if len(t.ToolCalls) > 0 {
+            // Build assistant message with tool_use blocks, then a user message
+            // with the corresponding tool_result blocks. This is the format the
+            // Anthropic API requires for tool call history.
+            msgs = append(msgs, buildToolUseMessage(t)...)
+        } else {
+            msgs = append(msgs, anthropic.AssistantMessage(t.AssistantResponse))
+        }
+    }
+    return msgs
+}
 ```
 
 ---
@@ -434,12 +564,15 @@ async def handle_message(self, message: Message) -> None:
 
 ```toml
 [session]
-storage_dir = "sessions"              # Relative to ~/.klawmbing/
-max_turns_in_context = 50             # Max turns sent to LLM
-max_turns_before_compaction = 30      # Phase 2: triggers compaction
-max_file_size_mb = 10                 # Warn if session file exceeds this
-load_on_startup = true                # Load most recent sessions on startup
+storage_dir               = "sessions"   # Relative to ~/.klawmbing/
+max_turns_in_context      = 50           # Max turns sent to LLM (Phase 1 limit)
+max_turns_before_compaction = 30         # Phase 2: triggers compaction check hook
+max_file_size_mb          = 10           # Log warning if session file exceeds this
+max_context_tokens        = 40000        # Phase 2: token budget for GetContextTurns
+load_on_startup           = true         # Load all session files at startup
 ```
+
+All fields are required. Fail fast at startup if any are missing (pydantic-equivalent: use a validated struct with `toml:"..."` tags and check zero values explicitly, or use a validation library like `go-playground/validator`).
 
 ---
 
@@ -447,37 +580,40 @@ load_on_startup = true                # Load most recent sessions on startup
 
 | Error | Handling | User-facing |
 |-------|----------|-------------|
-| Session file corrupted (invalid JSON line) | Skip corrupt line, log warning, continue loading remaining lines | None (transparent recovery) |
-| Disk full (can't write session) | Log error, continue operating in memory-only mode | None (session persists in memory until disk space freed) |
-| Session file exceeds max_file_size_mb | Log warning, continue operating | None (warning only, no action until compaction is implemented) |
-| Post-turn hook fails | Catch exception, log full traceback, continue | None (hooks never affect user response) |
-| Session loading takes > 5s on startup | Log warning with file size | None (startup takes a moment, acceptable) |
+| Session file corrupted (invalid JSON line) | Skip corrupt line with `slog.Warn`; continue loading remaining lines | None (transparent recovery) |
+| Disk full on `Persist` | Log `slog.Error`; session remains in memory until disk space is freed | None (in-memory session intact for remainder of process lifetime) |
+| Session file exceeds `max_file_size_mb` | Log `slog.Warn` after `Persist`; no other action in Phase 1 | None (warning only) |
+| Post-turn hook returns error | `slog.Error` with hook name, session ID, turn ID; error discarded | None (hooks never affect user response) |
+| Hook exceeds 5-second deadline | Context cancelled; hook returns; `slog.Error` logged | None |
+| `LoadAll` takes > 5s | Log `slog.Warn` with duration and file sizes | None (startup is slow; acceptable) |
+| `ResolveOrCreate` race on new session | `sync.Map.LoadOrStore` returns the winner; loser is GC'd | None (transparent) |
 
 ---
 
 ## 9. Acceptance Criteria
 
 - [ ] Multi-turn conversation works: agent recalls what was said earlier in the same session
-- [ ] After restarting Klawmbing, the agent recalls previous conversation from loaded session
+- [ ] After restarting Klawmbing, the agent recalls previous conversation from the loaded session
 - [ ] CLI and Telegram sessions are independent (different session IDs, different histories)
-- [ ] Session JSONL file contains readable, complete turn records
-- [ ] Corrupt JSONL lines are skipped with a warning (don't crash on bad data)
+- [ ] Session JSONL file contains readable, complete turn records parseable with `jq`
+- [ ] Corrupt JSONL lines are skipped with a `slog.Warn` (no panic, no crash)
 - [ ] Post-turn hooks execute after every response
-- [ ] Post-turn hook failure is logged but doesn't affect the response
-- [ ] Startup log shows loaded sessions: "Loaded N sessions (M total turns)"
+- [ ] Post-turn hook failure is logged and does not affect the response or subsequent turns
+- [ ] Startup log shows: "Loaded N sessions (M total turns)"
 - [ ] Session file size warning triggers at 10MB
+- [ ] `go test ./core/...` passes with a session that survives a simulated restart (write turns, reinitialise manager, load from disk, assert turns match)
 
 ---
 
 ## 10. Open Questions
 
-| ID | Question | Default |
+| ID | Question | Decision |
 |----|----------|---------|
-| TODO-P01 | Should tool call details (full input/output) be stored in session history? They can be large (e.g., gbrain search results). | Store tool name + truncated output (first 500 chars). Full details go in tool-calls.jsonl. Keeps session files manageable. |
-| TODO-P02 | Session file rotation: should we create a new file per day, or one file per session forever? Daily files are smaller but complicate loading. | One file per session. Phase 2: implement compaction to control size. |
-| TODO-P03 | Should the agent see tool call history in the context? Claude's API supports tool_use/tool_result content blocks in history. Including them gives better continuity but uses more tokens. | Yes, include tool calls in context. The LLM needs to know what tools were used and what they returned to maintain coherent conversation. Truncate large tool outputs to 500 chars in session history. |
-| TODO-P04 | Maximum session age: should sessions expire after N days of inactivity? | No expiry. Sessions are cheap to store. If the operator picks up a conversation after 2 weeks, the context should still be available. The brain stores durable facts; the session stores conversation flow. |
-| TODO-P05 | Should there be a `/reset` command to start a fresh session? | Yes, add in Phase 2 as a slash command. For hello world, manually deleting the JSONL file achieves this. |
+| TODO-P01 | Should tool call details (full input/output) be stored in session history? They can be large (e.g. gbrain search results). | Store tool name + output truncated to 500 chars in `ToolCallRecord.Output`. Full output goes to `tool-calls.jsonl`. Keeps session files manageable. |
+| TODO-P02 | Session file rotation: new file per day, or one file per session forever? | One file per session. Phase 2: compaction controls size. |
+| TODO-P03 | Should the agent see tool call history in the context? | Yes — include `tool_use`/`tool_result` content blocks. The LLM needs tool history for coherent continuity. Truncate large outputs to 500 chars when building API messages. |
+| TODO-P04 | Maximum session age: should sessions expire after N days of inactivity? | No expiry. Sessions are cheap to store. The brain holds durable facts; the session holds conversation flow. |
+| TODO-P05 | Should there be a `/reset` command to start a fresh session? | Phase 2 slash command. For hello world: delete the JSONL file manually. |
 
 ---
 
@@ -486,27 +622,29 @@ load_on_startup = true                # Load most recent sessions on startup
 This is the complete flow when all five PRDs are implemented:
 
 ```
-1. Operator runs: python klawmbing.py
+1. Operator runs: go run ./klawmbing.go
    ├── config.toml loaded and validated (PRD-01)
-   ├── LLM caller initialized with Anthropic SDK (PRD-01)
+   ├── LLM caller initialised with Anthropic SDK (PRD-01)
    ├── Tool registry created (PRD-01)
    ├── GBrain MCP server started, tools discovered and registered (PRD-03)
    ├── Identity files loaded: AGENTS.md, SOUL.md, USER.md (PRD-04)
    ├── Skills loaded: note-capture, research (PRD-04)
-   ├── Active sessions loaded from disk (PRD-05)
+   ├── SessionManager.LoadAll() — active sessions loaded from disk (PRD-05)
    ├── CLI adapter started (PRD-02)
-   ├── Telegram adapter started, polling (PRD-02)
-   └── Log: "Klawmbing started. Adapters: CLI, Telegram. Brain: connected (32 tools). Skills: 2."
+   ├── Telegram adapter started, long-polling (PRD-02)
+   └── slog.Info: "Klawmbing started. Adapters: CLI, Telegram. Brain: connected (32 tools). Skills: 2."
 
 2. Operator sends via Telegram: "Hello, who are you?"
-   ├── Telegram adapter receives message (PRD-02)
-   ├── Message normalized to Message object (PRD-02)
-   ├── Session resolved: main:telegram:123456789 (PRD-05) — new session created
-   ├── Skill resolver: no match → general mode (PRD-04)
+   ├── Telegram adapter receives update (PRD-02)
+   ├── Message normalised to Message{SessionID: "main:telegram:123456789", ...} (PRD-02)
+   ├── SessionManager.ResolveOrCreate() — new Session created (PRD-05)
+   ├── Skill resolver: no match -> general mode (PRD-04)
    ├── Context assembled: AGENTS.md + SOUL.md + USER.md (PRD-04)
    ├── LLM called with context + message (PRD-01)
    ├── Response streamed via editMessageText (PRD-02)
-   ├── Turn persisted to sessions/main_telegram_123456789.jsonl (PRD-05)
+   ├── session.AddTurn(turn)
+   ├── RunHooks() -> PersistSessionHook writes main_telegram_123456789.jsonl (PRD-05)
+   ├── RunHooks() -> LogMetricsHook writes tool-calls.jsonl (PRD-05)
    └── Agent: "I'm Klawmbing, your personal AI agent. I have access to a knowledge
         brain and can research, remember things, and help you think through problems.
         What are you working on?"
@@ -514,20 +652,21 @@ This is the complete flow when all five PRDs are implemented:
 3. Operator sends: "Remember that our staging cluster is ap-southeast-1"
    ├── Skill resolver: "remember" matches note-capture (PRD-04)
    ├── Context assembled: identity + note-capture skill (PRD-04)
-   ├── LLM called → decides to invoke gbrain_put tool (PRD-01, PRD-03)
+   ├── GetContextTurns() returns [turn 1] (PRD-05)
+   ├── LLM called -> decides to invoke gbrain_put tool (PRD-01, PRD-03)
    ├── Tool executed: gbrain_put(title="Staging Cluster", ...) (PRD-03)
    ├── LLM receives tool result, generates confirmation
    ├── Response: "Stored. Staging cluster is in ap-southeast-1."
-   └── Turn persisted with tool call details (PRD-05)
+   └── Turn persisted with ToolCallRecord to JSONL (PRD-05)
 
 4. Operator restarts Klawmbing (kill + restart)
-   ├── Session loaded from disk: main_telegram_123456789 (2 turns) (PRD-05)
+   ├── LoadAll() reads main_telegram_123456789.jsonl: 2 turns loaded (PRD-05)
    └── GBrain reconnected (PRD-03)
 
 5. Operator sends: "What do you know about our staging cluster?"
-   ├── Context includes 2 previous turns from loaded session (PRD-05)
-   ├── LLM called → decides to invoke gbrain_search("staging cluster") (PRD-03)
+   ├── GetContextTurns() returns both prior turns (PRD-05)
+   ├── LLM called -> decides to invoke gbrain_search("staging cluster") (PRD-03)
    ├── GBrain returns the stored page
    ├── Response: "Your staging cluster is in ap-southeast-1."
-   └── ✅ Hello World complete: chat → brain → persistence → recall works end-to-end.
+   └── Hello World complete: chat -> brain -> persistence -> recall works end-to-end.
 ```

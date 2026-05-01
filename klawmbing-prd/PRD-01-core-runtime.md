@@ -19,9 +19,9 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 
 ## 2. Goals
 
-- **G1:** A single `python klawmbing.py` command starts the entire runtime
+- **G1:** A single `./klawmbing` binary (built with `go build -o klawmbing ./cmd/klawmbing/`) starts the entire runtime
 - **G2:** The runtime loads configuration from a TOML file (API keys, model config, adapter toggles)
-- **G3:** The LLM caller sends messages to the Claude API and streams tokens back
+- **G3:** The LLM caller sends messages to the Claude API and streams tokens back via a channel
 - **G4:** Tool calls in the LLM response are dispatched to registered tool handlers
 - **G5:** The runtime defines clean interface contracts for adapters, tools, and post-turn hooks
 - **G6:** Errors in any component do not crash the main process
@@ -52,12 +52,12 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 
 | ID | Story | Acceptance Criteria |
 |----|-------|-------------------|
-| US-R01 | As an operator, I run `python klawmbing.py` and the process starts without errors | Process starts, logs "Klawmbing started" with loaded config summary (model, adapters enabled) |
+| US-R01 | As an operator, I run `./klawmbing` and the process starts without errors | Process starts, logs "Klawmbing started" with loaded config summary (model, adapters enabled) |
 | US-R02 | As an operator, I provide a config.toml with my Anthropic API key and model preferences | Runtime reads config, validates required fields, fails fast with clear error if API key is missing |
-| US-R03 | As an operator, I send a message through any adapter and receive a streamed response | First token arrives in < 2s, full response streams to the adapter's `send()` method |
+| US-R03 | As an operator, I send a message through any adapter and receive a streamed response | First token arrives in < 2s, full response streams to the adapter's `Send()` method |
 | US-R04 | As an operator, if the LLM returns a tool_use block, the registered handler is called | Tool handler receives the tool name + input, returns result, and the LLM continues with the tool result |
-| US-R05 | As an operator, if a tool handler throws an exception, the error is caught and reported gracefully | Error message returned to chat, process continues running, error logged to tool-calls.jsonl |
-| US-R06 | As an operator, I can see all LLM calls and tool invocations in a log file | tool-calls.jsonl contains: timestamp, session_id, prompt hash, tool name, input, output, tokens used, latency |
+| US-R05 | As an operator, if a tool handler returns an error, the error is caught and reported gracefully | Error message returned to chat, process continues running, error logged to tool-calls.jsonl |
+| US-R06 | As an operator, I can see all LLM calls and tool invocations in a log file | tool-calls.jsonl contains: timestamp, session_id, message_id, tool name, input, output, tokens used, latency |
 
 ---
 
@@ -66,21 +66,26 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 ### 6.1 Directory Structure (this PRD's scope)
 
 ```
-~/.klawmbing/
-├── klawmbing.py           # Entry point
-├── config.toml            # Configuration
-├── core/
-│   ├── __init__.py
-│   ├── config.py          # Config loader + validation
-│   ├── runtime.py         # Main loop, component orchestration
-│   ├── llm.py             # Claude API caller with streaming
-│   ├── tools.py           # Tool registry + dispatcher
-│   └── types.py           # Shared data types (Message, ToolCall, etc.)
+klawmbing/
+├── cmd/klawmbing/main.go       # Entry point: parse flags, load config, start runtime
+├── internal/
+│   ├── config/config.go        # Config struct + TOML loader + validation
+│   ├── runtime/runtime.go      # KlawmbingRuntime — wires all components, message loop
+│   ├── llm/llm.go              # LLMCaller — SDK wrapper, streaming, tool loop
+│   ├── tools/tools.go          # ToolRegistry — register/dispatch/log
+│   └── types/types.go          # Shared types: Message, Response, ToolCall, ToolResult, TokenUsage
 ├── adapters/
-│   └── base.py            # ChannelAdapter abstract interface
+│   ├── adapter.go              # ChannelAdapter interface
+│   ├── cli/cli.go
+│   └── telegram/telegram.go
+├── skills/                     # SKILL.md files (populated by PRD-04)
+├── identity/                   # AGENTS.md, SOUL.md, USER.md (populated by PRD-04)
+├── sessions/                   # JSONL session files (populated by PRD-05)
 ├── logs/
-│   └── tool-calls.jsonl   # Audit trail
-└── identity/              # Created empty, populated by PRD-04
+│   └── tool-calls.jsonl        # Audit trail for every LLM call and tool invocation
+├── go.mod
+├── go.sum
+└── config.toml
 ```
 
 ### 6.2 Configuration Schema (config.toml)
@@ -88,15 +93,14 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 ```toml
 [klawmbing]
 name = "Klawmbing"
-log_level = "INFO"                    # DEBUG | INFO | WARNING | ERROR
+log_level = "INFO"                    # DEBUG | INFO | WARN | ERROR
 
 [llm]
-provider = "anthropic"
-model = "claude-sonnet-4-6-20260326"  # Primary model
-extraction_model = "claude-haiku-4-5-20251001"  # Cheap model for extraction
+model = "claude-sonnet-4-6-20260326"          # Primary model
+extraction_model = "claude-haiku-4-5-20251001" # Cheap model for extraction
 max_tokens = 8192
-temperature = 0.7
-api_key_env = "ANTHROPIC_API_KEY"     # Read from env var, never stored in file
+max_tool_rounds = 10                          # Limit tool-use loop iterations
+api_key_env = "ANTHROPIC_API_KEY"             # Read from env, never stored in file
 
 [adapters]
 cli_enabled = true
@@ -107,11 +111,14 @@ discord_token_env = "DISCORD_BOT_TOKEN"
 
 [brain]
 enabled = false                       # Enabled in PRD-03
-mcp_transport = "stdio"              # "stdio" | "sse"
-gbrain_command = "gbrain serve"      # Command to start MCP server
+gbrain_command = "gbrain"
+gbrain_args = ["serve"]
+gbrain_working_dir = "~/brain"
+tool_prefix = "gbrain"
 
 [session]
 storage_dir = "sessions"
+max_turns_in_context = 50
 max_turns_before_compaction = 30      # Phase 2
 
 [skills]
@@ -120,229 +127,307 @@ identity_dir = "identity"
 ```
 
 **Validation rules:**
-- `api_key_env` must resolve to a non-empty environment variable
-- If `telegram_enabled = true`, `telegram_token_env` must resolve
-- `model` must be a valid Anthropic model string
-- Fail fast on startup with clear error messages for any invalid config
+- `api_key_env` must resolve to a non-empty environment variable — fail fast if empty
+- If `telegram_enabled = true`, `telegram_token_env` must resolve to a non-empty value
+- `model` must be a non-empty string
+- `max_tool_rounds` must be > 0; default to 10 if unset
+- Validation is performed by `config.Validate() error` after loading; all errors are collected and printed together before exit
 
-### 6.3 Core Data Types (types.py)
+### 6.3 Go Module
 
-```python
-@dataclass
-class Message:
-    """Normalized message from any channel adapter."""
-    id: str                    # Unique message ID (UUID)
-    session_id: str            # Session this message belongs to
-    channel: str               # "telegram" | "discord" | "cli"
-    sender: str                # User identifier
-    content: str               # Message text
-    timestamp: datetime        # When received
-    attachments: list[str]     # File paths (future)
-    metadata: dict             # Channel-specific extras
+```
+module github.com/dandi/klawmbing
 
-@dataclass
-class Response:
-    """Response from the LLM, potentially with tool calls."""
-    content: str               # Text response
-    tool_calls: list[ToolCall] # Tool invocations requested by LLM
-    usage: TokenUsage          # Token counts
-    model: str                 # Model that generated this
-
-@dataclass
-class ToolCall:
-    """A single tool invocation."""
-    id: str                    # Tool use ID from Claude API
-    name: str                  # Tool name
-    input: dict                # Tool input parameters
-    idempotency_key: str       # UUID for dedup (generated by runtime)
-
-@dataclass
-class ToolResult:
-    """Result of executing a tool."""
-    tool_call_id: str
-    output: str                # Stringified result
-    is_error: bool             # Whether the tool failed
-    duration_ms: int           # Execution time
-
-@dataclass
-class TokenUsage:
-    input_tokens: int
-    output_tokens: int
-    cache_read_tokens: int     # Prompt caching hits
-    cache_write_tokens: int
+go 1.23
 ```
 
-### 6.4 Channel Adapter Interface (adapters/base.py)
+**Key dependencies:**
 
-```python
-class ChannelAdapter(ABC):
-    """
-    Normalized interface for all chat platforms.
-    Each platform implements this contract.
-    """
+| Package | Purpose |
+|---------|---------|
+| `github.com/BurntSushi/toml` | TOML config parsing |
+| `github.com/anthropics/anthropic-sdk-go` | Claude API client |
+| `github.com/google/uuid` | Idempotency key generation |
+| `golang.org/x/sync/errgroup` | Coordinating post-turn hook goroutines |
 
-    @abstractmethod
-    async def start(self) -> None:
-        """Start listening for messages. Called once at startup."""
+Standard library covers the rest: `log/slog`, `os/signal`, `context`, `sync`, `encoding/json`, `net/http`.
 
-    @abstractmethod
-    async def stop(self) -> None:
-        """Graceful shutdown."""
+### 6.4 Core Data Types (internal/types/types.go)
 
-    @abstractmethod
-    async def send(self, session_id: str, content: str,
-                   attachments: list[str] | None = None) -> None:
-        """Send a message back to the user."""
+```go
+// Message is a normalized inbound message from any channel adapter.
+type Message struct {
+    ID        string            // UUID, generated by the adapter on receipt
+    SessionID string            // Format: {scope}:{channel}:{identifier}
+    Channel   string            // "telegram" | "discord" | "cli"
+    Sender    string            // Platform user identifier
+    Content   string            // Message text
+    Timestamp time.Time
+    Metadata  map[string]string // Channel-specific extras (e.g. chat_id, reply_to)
+}
 
-    @abstractmethod
-    async def send_streaming(self, session_id: str,
-                             token_generator) -> None:
-        """Stream tokens back to the user as they arrive."""
+// Response is the assembled result of one LLM turn (after all tool rounds complete).
+type Response struct {
+    Content   string      // Final text content (empty if last turn was tool-only)
+    ToolCalls []ToolCall  // All tool calls made during this turn
+    Usage     TokenUsage
+    Model     string
+}
 
-    def set_message_handler(self, handler: Callable) -> None:
-        """Register the callback for incoming messages.
-        handler signature: async def handle(message: Message) -> None
-        """
-        self._message_handler = handler
+// ToolCall represents a single tool invocation requested by the LLM.
+type ToolCall struct {
+    ID             string          // tool_use ID from Claude API
+    Name           string          // Registered tool name
+    Input          json.RawMessage // Raw JSON input — handler unmarshals as needed
+    IdempotencyKey string          // UUID generated by the runtime before dispatch
+}
+
+// ToolResult is the outcome of executing a ToolCall.
+type ToolResult struct {
+    ToolCallID string
+    Output     string // Stringified result passed back to the LLM
+    IsError    bool
+    DurationMS int64
+}
+
+// TokenUsage tracks token counts across all rounds of a single turn.
+type TokenUsage struct {
+    InputTokens       int
+    OutputTokens      int
+    CacheReadTokens   int // Prompt caching hits
+    CacheWriteTokens  int
+}
 ```
 
-### 6.5 Tool Registry (tools.py)
+### 6.5 Channel Adapter Interface (adapters/adapter.go)
 
-```python
-class ToolRegistry:
-    """
-    Registry of available tools that the LLM can invoke.
-    Each tool has a name, description (for the LLM), and handler function.
-    """
+```go
+// ChannelAdapter is the normalized interface for all chat platforms.
+// Each platform implements this contract; the runtime holds a []ChannelAdapter.
+type ChannelAdapter interface {
+    // Start begins listening for inbound messages.
+    // Blocks until ctx is cancelled or a fatal error occurs.
+    Start(ctx context.Context) error
 
-    def register(self, name: str, description: str,
-                 input_schema: dict, handler: Callable) -> None:
-        """Register a tool. Called at startup by each component."""
+    // Stop performs a graceful shutdown, draining in-flight sends.
+    Stop() error
 
-    def get_tool_definitions(self) -> list[dict]:
-        """Return tool definitions in Claude API format."""
+    // Send delivers a complete message to the user identified by sessionID.
+    Send(ctx context.Context, sessionID string, msg string) error
 
-    async def execute(self, tool_call: ToolCall) -> ToolResult:
-        """
-        Execute a tool call with:
-        1. Idempotency check (skip if already executed)
-        2. Timeout enforcement
-        3. Error wrapping
-        4. Audit logging
-        """
+    // SendStreaming consumes tokens from the channel and delivers them to the user.
+    // Implementations must drain the channel fully even if the context is cancelled.
+    SendStreaming(ctx context.Context, sessionID string, tokens <-chan string) error
 
-    def _log_tool_call(self, tool_call: ToolCall,
-                       result: ToolResult) -> None:
-        """Append to tool-calls.jsonl."""
+    // SetMessageHandler registers the callback invoked for each inbound message.
+    // The handler must be set before Start is called.
+    // Signature: func(ctx context.Context, msg types.Message) error
+    SetMessageHandler(handler MessageHandler)
+}
+
+// MessageHandler is the function signature adapters call when a message arrives.
+type MessageHandler func(ctx context.Context, msg types.Message) error
 ```
 
-### 6.6 LLM Caller (llm.py)
+### 6.6 Tool Registry (internal/tools/tools.go)
 
-```python
-class LLMCaller:
-    """
-    Wraps the Anthropic Python SDK.
-    Handles: streaming, tool use loops, token tracking.
-    """
+```go
+// ToolHandler is the function signature every tool must implement.
+// input is the raw JSON from the LLM's tool_use block.
+// Return (result string, err error); on error the registry wraps it as an error ToolResult.
+type ToolHandler func(ctx context.Context, input json.RawMessage) (string, error)
 
-    async def call(self, messages: list[dict],
-                   system_prompt: str,
-                   tools: list[dict] | None = None,
-                   model: str | None = None) -> AsyncGenerator:
-        """
-        Send messages to Claude API with streaming.
+// ToolDefinition carries everything the registry needs to describe a tool to the LLM
+// and dispatch calls to the handler.
+type ToolDefinition struct {
+    Name        string
+    Description string
+    InputSchema json.RawMessage // JSON Schema object sent to Claude API
+    Handler     ToolHandler
+}
 
-        Yields:
-        - TextDelta events (for streaming to chat)
-        - ToolCall events (for tool execution)
-        - Final Response (when complete)
+// ToolRegistry is a concurrency-safe registry of available tools.
+type ToolRegistry struct {
+    mu    sync.RWMutex
+    tools map[string]ToolDefinition
+    logW  io.Writer // destination for tool-calls.jsonl lines
+}
 
-        Handles the tool use loop internally:
-        1. Send messages to Claude
-        2. If response contains tool_use, execute via ToolRegistry
-        3. Append tool_result to messages
-        4. Call Claude again with results
-        5. Repeat until Claude returns end_turn
-        """
+func NewToolRegistry(logWriter io.Writer) *ToolRegistry
 
-    async def call_extraction(self, content: str,
-                               prompt: str) -> str:
-        """
-        Use the cheap extraction model (Haiku) for
-        fact extraction, summarization, etc.
-        Non-streaming, returns full text.
-        """
+// Register adds or replaces a tool. Safe to call concurrently (e.g. during MCP discovery).
+func (r *ToolRegistry) Register(def ToolDefinition)
+
+// Definitions returns tool definitions in the format expected by the Claude API.
+// The returned slice is a snapshot; safe to read after the call returns.
+func (r *ToolRegistry) Definitions() []anthropic.ToolParam
+
+// Execute dispatches a ToolCall with idempotency check, timeout, error wrapping,
+// and audit logging. It never panics; all errors become IsError ToolResults.
+func (r *ToolRegistry) Execute(ctx context.Context, call types.ToolCall) types.ToolResult
+```
+
+**Execute internals (not exposed, for implementer reference):**
+
+1. Check an in-memory `map[string]bool` of `IdempotencyKey` values under read lock; if already executed, return the cached result.
+2. Release read lock; acquire write lock; check again (double-checked locking pattern).
+3. Set a 30-second deadline on `ctx` for the handler call.
+4. Call `handler(ctx, call.Input)`.
+5. Record result in idempotency cache.
+6. Append one JSON line to `logW`.
+
+### 6.7 LLM Caller (internal/llm/llm.go)
+
+```go
+// LLMCaller wraps the Anthropic Go SDK.
+// It owns the streaming tool-use loop and token accounting.
+type LLMCaller struct {
+    client          *anthropic.Client
+    model           string
+    extractionModel string
+    maxTokens       int
+    maxToolRounds   int
+    registry        *tools.ToolRegistry
+}
+
+func NewLLMCaller(cfg config.LLMConfig, registry *tools.ToolRegistry) (*LLMCaller, error)
+
+// Call sends a conversation to Claude and executes the tool-use loop until the model
+// returns stop_reason "end_turn" or maxToolRounds is exhausted.
+//
+// Streaming tokens are sent to tokenCh as they arrive; the caller must drain this channel.
+// tokenCh is closed when the final turn completes (successfully or not).
+// The completed Response (full text + all tool calls + cumulative usage) is returned.
+//
+// messages follows the Claude API message format ([]anthropic.MessageParam).
+func (c *LLMCaller) Call(
+    ctx context.Context,
+    messages []anthropic.MessageParam,
+    systemPrompt string,
+    tokenCh chan<- string,
+) (types.Response, error)
+
+// CallExtraction uses the cheap extraction model (Haiku) for non-streaming tasks
+// such as fact extraction or summarization. Returns the full text response.
+func (c *LLMCaller) CallExtraction(ctx context.Context, prompt string) (string, error)
+```
+
+**Tool-use loop (implemented inside `Call`, not exposed):**
+
+```
+for round := 0; round < c.maxToolRounds; round++ {
+    stream := client.Messages.NewStreaming(ctx, params)
+    // read stream events:
+    //   - RawContentBlockDeltaEvent with TextDelta → send to tokenCh
+    //   - RawContentBlockStopEvent with tool_use  → collect ToolCall
+    // accumulate full message
+    if message.StopReason == "end_turn" {
+        break
+    }
+    // execute all tool calls, collect ToolResults
+    // append assistant message + tool_result blocks to messages
+    // loop
+}
+close(tokenCh)
+return assembled Response
 ```
 
 **Critical implementation notes:**
-- Use `anthropic.AsyncAnthropic` for async operation
-- Set `stream=True` for all primary calls
-- Track token usage across the full tool-use loop (sum all turns)
-- Implement exponential backoff on rate limit errors (429)
-- Timeout: 120 seconds per API call (long-running tool loops can take time)
+- Use `anthropic.NewClient()` which reads `ANTHROPIC_API_KEY` from the environment automatically — do not pass the key explicitly in code.
+- Set `cache_control` on the system prompt block (type `ephemeral`) from day 1; the identity layer is identical across turns, making it a perfect cache candidate.
+- Accumulate `TokenUsage` across all rounds by summing `Usage` from each API response.
+- On HTTP 429: exponential backoff starting at 1s, doubling, capped at 30s, max 3 retries; log each retry at WARN level.
+- Per-call deadline: 120 seconds (long tool loops). Pass via `context.WithTimeout` inside `Call`.
 
-### 6.7 Runtime Orchestration (runtime.py)
+### 6.8 Runtime Orchestration (internal/runtime/runtime.go)
 
-```python
-class KlawmbingRuntime:
-    """
-    The main orchestrator. Wires everything together.
-    """
+```go
+// KlawmbingRuntime wires all components together and owns the message loop.
+type KlawmbingRuntime struct {
+    cfg        config.Config
+    llm        *llm.LLMCaller
+    tools      *tools.ToolRegistry
+    adapters   []adapters.ChannelAdapter
+    // session manager added by PRD-05; context assembler added by PRD-04
+}
 
-    async def start(self):
-        """
-        1. Load config
-        2. Initialize LLM caller
-        3. Initialize tool registry
-        4. Start MCP connections (PRD-03)
-        5. Load identity files (PRD-04)
-        6. Start enabled channel adapters
-        7. Log startup summary
-        """
+func NewKlawmbingRuntime(cfg config.Config) (*KlawmbingRuntime, error)
 
-    async def handle_message(self, message: Message) -> None:
-        """
-        The core loop — called by channel adapters on every incoming message.
+// Start initializes all components and launches each adapter in its own goroutine.
+// Returns when ctx is cancelled (graceful shutdown) or a fatal error occurs.
+//
+// Startup sequence:
+//  1. Initialize LLM caller
+//  2. Initialize tool registry
+//  3. Spawn MCP connections (PRD-03)
+//  4. Load identity files (PRD-04)
+//  5. Start enabled channel adapters (each in its own goroutine)
+//  6. Log startup summary (model, adapters enabled, tool count)
+func (r *KlawmbingRuntime) Start(ctx context.Context) error
 
-        1. Resolve session (PRD-05)
-        2. Assemble context (PRD-04: identity + skill + session history + brain context)
-        3. Call LLM with assembled context
-        4. Stream response tokens to adapter
-        5. If tool calls: execute, continue LLM loop
-        6. Post-turn hook: persist session, extract facts (PRD-05)
-        7. Log completion metrics
-        """
+// HandleMessage is the core loop invoked by channel adapters for every inbound message.
+//
+//  1. Resolve session and load history (PRD-05)
+//  2. Assemble context: identity + skill + session history (PRD-04)
+//  3. Create tokenCh and call LLM.Call in a goroutine
+//  4. Pass tokenCh to adapter.SendStreaming while the goroutine runs
+//  5. Wait for LLM.Call to return; collect Response
+//  6. Run post-turn hooks via errgroup (session persist + metrics log)
+//     — hook errors are logged, never propagated
+//  7. Log completion metrics (session_id, tokens, latency, tool call count)
+func (r *KlawmbingRuntime) HandleMessage(ctx context.Context, msg types.Message) error
 
-    async def shutdown(self):
-        """Graceful shutdown: stop adapters, flush logs, close connections."""
+// Shutdown stops all adapters, flushes in-flight logs, and closes connections.
+func (r *KlawmbingRuntime) Shutdown(ctx context.Context) error
 ```
 
-### 6.8 Entry Point (klawmbing.py)
+**Post-turn hooks** use `golang.org/x/sync/errgroup`. Each hook is a goroutine; the group is started with a fresh context so a hook timeout does not propagate to the next message. All `error` returns from hooks are logged at ERROR level and discarded.
 
-```python
-"""
-Klawmbing entry point.
+### 6.9 Entry Point (cmd/klawmbing/main.go)
 
-Usage:
-    python klawmbing.py                    # Start with default config
-    python klawmbing.py --config path.toml # Start with custom config
-    python klawmbing.py --validate         # Validate config and exit
-"""
+```go
+// Usage:
+//   ./klawmbing                      — start with default config.toml
+//   ./klawmbing --config path.toml   — start with custom config
+//   ./klawmbing --validate           — validate config and exit 0/1
 
-async def main():
-    config = load_config(args.config)
-    runtime = KlawmbingRuntime(config)
+func main() {
+    flags := flag.NewFlagSet("klawmbing", flag.ExitOnError)
+    configPath := flags.String("config", "config.toml", "path to config file")
+    validateOnly := flags.Bool("validate", false, "validate config and exit")
+    flags.Parse(os.Args[1:])
 
-    # Graceful shutdown on SIGINT/SIGTERM
-    loop = asyncio.get_event_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda: asyncio.create_task(runtime.shutdown()))
+    cfg, err := config.Load(*configPath)
+    if err != nil {
+        slog.Error("config error", "err", err)
+        os.Exit(1)
+    }
+    if *validateOnly {
+        fmt.Println("config OK")
+        os.Exit(0)
+    }
 
-    await runtime.start()
+    ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+    defer cancel()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    rt, err := runtime.NewKlawmbingRuntime(cfg)
+    if err != nil {
+        slog.Error("runtime init failed", "err", err)
+        os.Exit(1)
+    }
+
+    if err := rt.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+        slog.Error("runtime exited with error", "err", err)
+        os.Exit(1)
+    }
+
+    shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer shutdownCancel()
+    rt.Shutdown(shutdownCtx)
+}
 ```
+
+**Signal handling:** `signal.NotifyContext` is the idiomatic Go approach — it cancels the root context on SIGINT/SIGTERM, which propagates through all components via `ctx`. No goroutine-per-signal needed.
 
 ---
 
@@ -350,62 +435,89 @@ if __name__ == "__main__":
 
 | Error Type | Handling | User-Facing |
 |------------|----------|-------------|
-| Config validation failure | Fail fast, print error, exit(1) | "Missing ANTHROPIC_API_KEY environment variable" |
-| Claude API rate limit (429) | Exponential backoff (1s, 2s, 4s, 8s, max 30s), 3 retries | "Processing... (retry N/3)" |
-| Claude API error (500) | Retry once after 2s, then report | "Something went wrong with the AI service. Try again." |
-| Tool handler exception | Catch, log full traceback, return error as tool result | LLM sees error and can retry or explain |
-| Adapter connection lost | Log warning, attempt reconnect every 10s | No immediate user message (they'll see the bot go offline) |
-| Unhandled exception in message handler | Catch at top level, log, send error to chat | "An unexpected error occurred. Check logs." |
+| Config validation failure | Collect all field errors, print together, `os.Exit(1)` | "config error: ANTHROPIC_API_KEY env var is empty" |
+| Claude API rate limit (429) | Exponential backoff (1s, 2s, 4s, 8s, max 30s), 3 retries; log each at WARN | "Processing... (retry N/3)" sent to adapter |
+| Claude API error (5xx) | Retry once after 2s; if still failing, return `error` from `LLMCaller.Call` | "Something went wrong with the AI service. Try again." |
+| Tool handler returns error | Wrap as `ToolResult{IsError: true}`; LLM receives the error string and can retry or explain | LLM decides how to surface it to the user |
+| Adapter `Send` failure | Log at ERROR; do not retry (message may already be partially delivered) | None (user sees nothing new; they can resend) |
+| `HandleMessage` returns error | Catch at adapter callback site; log; attempt to send error message to user | "An unexpected error occurred. Check logs." |
+| Hook goroutine panics | `recover()` in each hook wrapper; log stack trace; discard | None |
+
+Go does not use exceptions. Every function that can fail returns `(T, error)`. Panics are reserved for truly unrecoverable states (e.g. programmer error in `init()`).
 
 ---
 
 ## 8. Logging & Observability
 
+### Structured logging with `log/slog`
+
+Configure a `slog.JSONHandler` at startup using the `log_level` from config:
+
+```go
+level := slog.LevelInfo // default
+switch strings.ToUpper(cfg.Klawmbing.LogLevel) {
+case "DEBUG": level = slog.LevelDebug
+case "WARN":  level = slog.LevelWarn
+case "ERROR": level = slog.LevelError
+}
+slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+```
+
+Key log fields (always present in every structured log line):
+- `session_id` — attached via `slog.With` inside `HandleMessage`
+- `model` — on LLM call log lines
+- `latency_ms` — on completion log lines
+
 ### tool-calls.jsonl format
+
+One JSON object per line, appended by `ToolRegistry.Execute` and `LLMCaller.Call`:
 
 ```json
 {
   "timestamp": "2026-04-26T14:30:00Z",
   "session_id": "main:telegram:123456",
-  "message_id": "uuid-here",
+  "message_id": "550e8400-e29b-41d4-a716-446655440000",
   "type": "llm_call",
   "model": "claude-sonnet-4-6-20260326",
   "input_tokens": 2340,
   "output_tokens": 512,
   "cache_read_tokens": 1800,
+  "cache_write_tokens": 540,
   "latency_ms": 1450,
   "tool_calls": [
     {
       "name": "gbrain_search",
-      "input": {"query": "staging cluster"},
+      "idempotency_key": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
       "output_length": 340,
       "is_error": false,
-      "duration_ms": 230,
-      "idempotency_key": "uuid-here"
+      "duration_ms": 230
     }
   ]
 }
 ```
 
-### Console logging
+Tool input is intentionally omitted from the log line (may contain secrets). If debug-level tracing is needed, a separate debug log file can be added in Phase 2.
 
-- Startup: config summary, enabled adapters, tool count
-- Per-message: session_id, token usage, latency, tool call count
-- Errors: full context including message content (truncated to 200 chars)
+### Console output (stderr)
+
+- **Startup:** `Klawmbing started model=... adapters=[cli] tools=0`
+- **Per-message completion:** `turn complete session_id=... tokens=... latency_ms=... tool_calls=N`
+- **Errors:** Full error chain via `fmt.Errorf("context: %w", err)` unwrapping; message content truncated to 200 chars
 
 ---
 
 ## 9. Acceptance Criteria (Definition of Done)
 
-- [ ] `python klawmbing.py` starts without errors with valid config.toml
-- [ ] `python klawmbing.py --validate` checks config and exits cleanly
-- [ ] Missing API key causes immediate, clear error message
-- [ ] CLI adapter (implemented as the simplest possible adapter in PRD-02) can send a message and receive a streamed response
-- [ ] If a tool handler is registered and the LLM invokes it, the handler runs and the LLM receives the result
-- [ ] If a tool handler throws, the error is caught, logged, and the process continues
-- [ ] tool-calls.jsonl is written after every LLM call
-- [ ] SIGINT/SIGTERM triggers graceful shutdown (flush logs, close connections)
-- [ ] The process runs for 1 hour without memory leaks or crashes under idle + periodic message load
+- [ ] `./klawmbing` starts without errors with a valid `config.toml`
+- [ ] `./klawmbing --validate` checks config and exits 0 on success, 1 on failure
+- [ ] Missing `ANTHROPIC_API_KEY` causes an immediate, clear error before any network call
+- [ ] CLI adapter (implemented as the simplest possible adapter in PRD-02) can send a message and receive a streamed response via `tokenCh`
+- [ ] If a tool handler is registered and the LLM invokes it, the handler runs and the LLM receives the result in the next round
+- [ ] If a tool handler returns an error, it is caught, logged, and the process continues
+- [ ] `logs/tool-calls.jsonl` is written after every LLM call
+- [ ] SIGINT/SIGTERM triggers graceful shutdown: adapters drain, logs flush, connections close within 10 seconds
+- [ ] The binary runs for 1 hour without memory growth under idle + periodic message load (verify with `runtime.ReadMemStats`)
+- [ ] `go vet ./...` and `go build ./...` pass with zero warnings
 
 ---
 
@@ -413,6 +525,7 @@ if __name__ == "__main__":
 
 | ID | Question | Default |
 |----|----------|---------|
-| TODO-R01 | Should we use `pydantic` for config validation or keep it stdlib-only? Pydantic adds a dependency but gives schema validation for free. | Use pydantic. Single dependency, huge validation quality gain. |
-| TODO-R02 | Prompt caching: enable from day 1 or add later? Claude supports cache_control blocks that can reduce costs 90% for repeated system prompts. | Enable from day 1. The system prompt (AGENTS.md + SOUL.md) is identical across turns — perfect cache candidate. |
-| TODO-R03 | Should tool-calls.jsonl be rotated? At scale it could grow large. | Rotate daily. Keep 30 days. Implement in Phase 2. |
+| TODO-R01 | Should we use `slog.TextHandler` (human-readable) for local dev and `slog.JSONHandler` for prod, switchable via `log_format = "text" \| "json"` in config? | Default to JSON always; `jq` is available everywhere. Re-evaluate if the log noise is painful during development. |
+| TODO-R02 | Prompt caching: enable `cache_control` from day 1 or add later? The identity layer (AGENTS.md + SOUL.md + USER.md) is identical across turns — a perfect cache candidate. | Enable from day 1. The Go SDK supports `cache_control` on `SystemPromptParam` blocks. |
+| TODO-R03 | Should `tool-calls.jsonl` be rotated? At scale it could grow large. | Rotate daily, keep 30 days. Implement in Phase 2 using a simple `lumberjack`-style rotate-on-open approach. |
+| TODO-R04 | Should `HandleMessage` run one goroutine per adapter message concurrently, or serialize within a session? | Serialize per session (one in-flight turn per `session_id`); concurrency across sessions is fine. Use a `sync.Map[string]*sync.Mutex` keyed by session_id. |
