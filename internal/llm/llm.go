@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
@@ -153,12 +154,10 @@ func (c *Caller) Call(ctx context.Context, params CallParams) (*CallResult, erro
 				}
 
 				// Capture usage from message_delta event.
+				// InputTokens, CacheRead, and CacheWrite come only from message_start.
 				if event.Type == "message_delta" {
 					msgDelta := event.AsMessageDelta()
-					roundUsage.InputTokens += msgDelta.Usage.InputTokens
 					roundUsage.OutputTokens += msgDelta.Usage.OutputTokens
-					roundUsage.CacheRead += msgDelta.Usage.CacheReadInputTokens
-					roundUsage.CacheWrite += msgDelta.Usage.CacheCreationInputTokens
 					stopReason = msgDelta.Delta.StopReason
 				}
 
@@ -176,6 +175,9 @@ func (c *Caller) Call(ctx context.Context, params CallParams) (*CallResult, erro
 			responseContent = accumulated.Content
 			if stopReason == "" {
 				stopReason = accumulated.StopReason
+			}
+			if stopReason == "" {
+				slog.Warn("stream completed with empty stop reason", "model", c.cfg.LLM.Model)
 			}
 		} else {
 			// Non-streaming mode.
@@ -233,12 +235,16 @@ func (c *Caller) Call(ctx context.Context, params CallParams) (*CallResult, erro
 			if block.Type != "tool_use" {
 				continue
 			}
+			inputJSON, err := json.Marshal(block.Input)
+			if err != nil {
+				inputJSON = json.RawMessage(`{}`)
+			}
 			toolCall := types.ToolCall{
 				ID:    block.ID,
 				Name:  block.Name,
-				Input: json.RawMessage(block.Input),
+				Input: inputJSON,
 			}
-			result := c.registry.Execute(ctx, toolCall, "")
+			result := c.registry.Execute(ctx, toolCall, toolCall.ID)
 			output := TruncateToolResult(result.Output, c.cfg.LLM.MaxToolResultTokens)
 			toolResultBlocks = append(toolResultBlocks,
 				anthropic.NewToolResultBlock(block.ID, output, result.IsError),
