@@ -1,0 +1,17 @@
+[llm]
+api_key_env = "ANTHROPIC_API_KEY"
+
+[adapters.cli]
+enabled = true
+
+[brain]
+enabled = false
+
+[session]
+storage_dir = "sessions"
+
+[skills]
+dir = "skills"
+
+[identity]
+dir = "identity"
