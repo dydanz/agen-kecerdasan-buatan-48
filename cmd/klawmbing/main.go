@@ -1,4 +1,35 @@
 // Package main is the Klawmbing entry point.
 package main
 
-func main() {}
+import (
+	"flag"
+	"fmt"
+	"log/slog"
+	"os"
+
+	"github.com/dydanz/klawmbing/internal/config"
+)
+
+func main() {
+	configPath := flag.String("config", "config.toml", "path to config file")
+	validate := flag.Bool("validate", false, "validate config and exit")
+	flag.Parse()
+
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		slog.Error("config load failed", "err", err)
+		os.Exit(1)
+	}
+
+	if *validate {
+		fmt.Printf("config ok: model=%s adapter_cli=%v adapter_telegram=%v\n",
+			cfg.LLM.Model, cfg.Adapters.CLI.Enabled, cfg.Adapters.Telegram.Enabled)
+		return
+	}
+
+	// Runtime wiring is Phase 1 work (see .klawmbing-dev-plan/phase-1-session-runtime.md).
+	// This scaffold confirms config loads correctly; the daemon loop comes next.
+	slog.Info("klawmbing starting", "model", cfg.LLM.Model)
+	slog.Warn("runtime not yet wired — start with --validate to confirm config")
+	os.Exit(1)
+}

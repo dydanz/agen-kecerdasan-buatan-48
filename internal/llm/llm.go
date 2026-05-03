@@ -10,6 +10,7 @@ import (
 	anthropic "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
+	"github.com/google/uuid"
 
 	"github.com/dydanz/klawmbing/internal/config"
 	"github.com/dydanz/klawmbing/internal/tools"
@@ -23,6 +24,12 @@ type CallParams struct {
 	// Tokens is an optional channel to which streamed text tokens are sent.
 	// If nil, streaming is disabled and the response is returned in one shot.
 	Tokens chan<- string
+	// TurnID is a caller-assigned stable identifier for this message turn.
+	// Tool idempotency keys are derived from TurnID so they remain stable if
+	// the same turn is retried with a new model response (which carries new
+	// model-generated tool_use IDs). If empty, a random UUID is used —
+	// deduplication within the call still works but cross-retry protection is lost.
+	TurnID string
 }
 
 // CallResult is the output of a successful Call.
@@ -61,9 +68,21 @@ func TruncateToolResult(output string, maxTokens int) string {
 	return output[:maxChars] + " [truncated]"
 }
 
+// IdempotencyKey returns a deterministic key for a tool invocation within a turn.
+// Using (turnID, toolName, input) means the key is stable if the turn is retried:
+// the model may emit a new tool_use ID but the logical call is the same.
+func IdempotencyKey(turnID, toolName string, input json.RawMessage) string {
+	return fmt.Sprintf("%s|%s|%s", turnID, toolName, string(input))
+}
+
 // Call runs the LLM + tool loop and returns the final text result.
 func (c *Caller) Call(ctx context.Context, params CallParams) (*CallResult, error) {
 	start := time.Now()
+
+	turnID := params.TurnID
+	if turnID == "" {
+		turnID = uuid.New().String()
+	}
 
 	// Build the system prompt blocks.
 	var systemBlocks []anthropic.TextBlockParam
@@ -244,7 +263,8 @@ func (c *Caller) Call(ctx context.Context, params CallParams) (*CallResult, erro
 				Name:  block.Name,
 				Input: inputJSON,
 			}
-			result := c.registry.Execute(ctx, toolCall, toolCall.ID)
+			idemKey := IdempotencyKey(turnID, block.Name, inputJSON)
+			result := c.registry.Execute(ctx, toolCall, idemKey)
 			output := TruncateToolResult(result.Output, c.cfg.LLM.MaxToolResultTokens)
 			toolResultBlocks = append(toolResultBlocks,
 				anthropic.NewToolResultBlock(block.ID, output, result.IsError),

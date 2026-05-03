@@ -12,6 +12,31 @@ import (
 	"github.com/dydanz/klawmbing/internal/types"
 )
 
+func TestIdempotencyKey_Deterministic(t *testing.T) {
+	k1 := llm.IdempotencyKey("turn-1", "my_tool", json.RawMessage(`{"x":1}`))
+	k2 := llm.IdempotencyKey("turn-1", "my_tool", json.RawMessage(`{"x":1}`))
+	if k1 != k2 {
+		t.Errorf("same inputs produced different keys: %q vs %q", k1, k2)
+	}
+}
+
+func TestIdempotencyKey_VariesByTurnID(t *testing.T) {
+	input := json.RawMessage(`{"x":1}`)
+	k1 := llm.IdempotencyKey("turn-1", "my_tool", input)
+	k2 := llm.IdempotencyKey("turn-2", "my_tool", input)
+	if k1 == k2 {
+		t.Error("different turn IDs should produce different keys")
+	}
+}
+
+func TestIdempotencyKey_VariesByInput(t *testing.T) {
+	k1 := llm.IdempotencyKey("turn-1", "my_tool", json.RawMessage(`{"x":1}`))
+	k2 := llm.IdempotencyKey("turn-1", "my_tool", json.RawMessage(`{"x":2}`))
+	if k1 == k2 {
+		t.Error("different inputs should produce different keys")
+	}
+}
+
 func TestTruncateToolResult_ShortInput(t *testing.T) {
 	out := llm.TruncateToolResult("hello", 500)
 	if out != "hello" {
