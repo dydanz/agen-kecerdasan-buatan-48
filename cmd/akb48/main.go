@@ -27,7 +27,7 @@ func main() {
 		return
 	}
 
-	// Runtime wiring is Phase 1 work (see .akb48-dev-plan/phase-1-session-runtime.md).
+	// Runtime wiring is Phase 1 work (see akb48-dev-plan/phase-1-session-runtime.md).
 	// This scaffold confirms config loads correctly; the daemon loop comes next.
 	slog.Info("akb48 starting", "model", cfg.LLM.Model)
 	slog.Warn("runtime not yet wired — start with --validate to confirm config")
