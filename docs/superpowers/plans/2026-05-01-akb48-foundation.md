@@ -48,7 +48,7 @@ Start Plan 2 only after all Plan 1 tests pass.
 - [ ] **Step 1: Create directory structure**
 
 ```bash
-mkdir -p cmd/klawmbing \
+mkdir -p cmd/akb48 \
   internal/config/testdata \
   internal/types \
   internal/tools \
@@ -70,10 +70,10 @@ mkdir -p cmd/klawmbing \
 - [ ] **Step 2: Initialize Go module**
 
 ```bash
-go mod init github.com/dydanz/klawmbing
+go mod init github.com/dydanz/akb48
 ```
 
-Expected: `go.mod` created with `module github.com/dydanz/klawmbing` and `go 1.23`.
+Expected: `go.mod` created with `module github.com/dydanz/akb48` and `go 1.23`.
 
 - [ ] **Step 3: Add dependencies**
 
@@ -291,7 +291,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dydanz/klawmbing/internal/config"
+	"github.com/dydanz/akb48/internal/config"
 )
 
 func TestLoad_ValidConfig(t *testing.T) {
@@ -355,7 +355,7 @@ func TestLoad_DefaultsApplied(t *testing.T) {
 go test ./internal/config/... -v
 ```
 
-Expected: FAIL — `cannot find package "github.com/dydanz/klawmbing/internal/config"`
+Expected: FAIL — `cannot find package "github.com/dydanz/akb48/internal/config"`
 
 - [ ] **Step 4: Write config implementation**
 
@@ -536,8 +536,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/dydanz/klawmbing/internal/tools"
-	"github.com/dydanz/klawmbing/internal/types"
+	"github.com/dydanz/akb48/internal/tools"
+	"github.com/dydanz/akb48/internal/types"
 )
 
 func TestRegistry_ExecuteKnownTool(t *testing.T) {
@@ -627,7 +627,7 @@ func TestRegistry_DurationRecorded(t *testing.T) {
 go test ./internal/tools/... -v
 ```
 
-Expected: FAIL — `cannot find package "github.com/dydanz/klawmbing/internal/tools"`
+Expected: FAIL — `cannot find package "github.com/dydanz/akb48/internal/tools"`
 
 - [ ] **Step 3: Write tool registry implementation**
 
@@ -643,7 +643,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/dydanz/klawmbing/internal/types"
+	"github.com/dydanz/akb48/internal/types"
 )
 
 type ToolHandler func(ctx context.Context, input json.RawMessage) (string, error)
@@ -778,10 +778,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dydanz/klawmbing/internal/config"
-	"github.com/dydanz/klawmbing/internal/llm"
-	"github.com/dydanz/klawmbing/internal/tools"
-	"github.com/dydanz/klawmbing/internal/types"
+	"github.com/dydanz/akb48/internal/config"
+	"github.com/dydanz/akb48/internal/llm"
+	"github.com/dydanz/akb48/internal/tools"
+	"github.com/dydanz/akb48/internal/types"
 )
 
 func TestTruncateToolResult_ShortInput(t *testing.T) {
@@ -870,7 +870,7 @@ func TestCall_ToolLoop(t *testing.T) {
 go test ./internal/llm/... -v -run TestTruncate
 ```
 
-Expected: FAIL — `cannot find package "github.com/dydanz/klawmbing/internal/llm"`
+Expected: FAIL — `cannot find package "github.com/dydanz/akb48/internal/llm"`
 
 - [ ] **Step 3: Write LLM caller implementation**
 
@@ -885,9 +885,9 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/dydanz/klawmbing/internal/config"
-	"github.com/dydanz/klawmbing/internal/tools"
-	"github.com/dydanz/klawmbing/internal/types"
+	"github.com/dydanz/akb48/internal/config"
+	"github.com/dydanz/akb48/internal/tools"
+	"github.com/dydanz/akb48/internal/types"
 )
 
 // CallParams holds everything needed to make a single LLM call.

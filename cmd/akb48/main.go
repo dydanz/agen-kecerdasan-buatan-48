@@ -1,4 +1,4 @@
-// Package main is the Klawmbing entry point.
+// Package main is the akb48 entry point.
 package main
 
 import (

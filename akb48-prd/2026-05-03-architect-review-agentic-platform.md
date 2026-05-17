@@ -12,7 +12,7 @@
 **Weak — for the stated framing of "Agentic AI Platform for an engineering organization."**
 **Strong — for what the PRDs actually describe: a personal AI for a solo operator.**
 
-This is a category mismatch, not a quality problem. The PRDs are well-scoped, internally coherent, and explicitly self-limit to a single-operator use case. PRD-00 §5.3 lists multi-tenant, plugin ecosystem, and dashboards as **non-goals**. The research file `01-klawmbing-platform-landscape.md` explicitly rejects LangGraph/CrewAI/AutoGen as "team-platform orchestration" and chooses a "claw-class" runtime instead.
+This is a category mismatch, not a quality problem. The PRDs are well-scoped, internally coherent, and explicitly self-limit to a single-operator use case. PRD-00 §5.3 lists multi-tenant, plugin ecosystem, and dashboards as **non-goals**. The research file `01-akb48-platform-landscape.md` explicitly rejects LangGraph/CrewAI/AutoGen as "team-platform orchestration" and chooses a "claw-class" runtime instead.
 
 If the goal genuinely is a platform for an engineering organization, this design needs a structural rebuild, not a Phase 2 expansion. Calling the gaps below "Phase 2" undersells the work — the foundational primitives required (durable workflows, multi-tenancy, approval gates, eval) are not natural extensions of the current architecture; they replace pieces of it.
 
@@ -166,12 +166,12 @@ If you want the platform: invest first in durable workflows, multi-tenancy + RBA
 
 ## File References
 
-- `akb48-prd/PRD-00-klawmbing-master.md` — north star, non-goals
+- `akb48-prd/PRD-00-akb48-master.md` — north star, non-goals
 - `akb48-prd/PRD-01-core-runtime.md` — runtime, tool registry, LLM caller
 - `akb48-prd/PRD-02-channel-adapters.md` — Telegram + CLI only, no approval UX
 - `akb48-prd/PRD-03-gbrain-integration.md` — MCP delegation (good)
 - `akb48-prd/PRD-04-identity-skills.md` — single-skill-per-turn, substring resolver
 - `akb48-prd/PRD-05-session-management.md` — JSONL, no compaction in Phase 1
 - `akb48-prd/2026-05-01-memory-management-design.md` — entity taxonomy + scope (the org-relevant piece)
-- `akb48-rsh/01-klawmbing-platform-landscape.md` — explicit "not a team platform" positioning
-- `akb48-rsh/03-klawmbing-build-strategy-risks.md` — three-phase build plan, eval/skillify in Phase 3
+- `akb48-rsh/01-akb48-platform-landscape.md` — explicit "not a team platform" positioning
+- `akb48-rsh/03-akb48-build-strategy-risks.md` — three-phase build plan, eval/skillify in Phase 3

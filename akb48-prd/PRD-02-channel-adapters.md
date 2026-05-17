@@ -114,8 +114,8 @@ import (
 
     "github.com/google/uuid"
 
-    "klawmbing/adapters"
-    "klawmbing/core"
+    "github.com/dydanz/akb48/adapters"
+    "github.com/dydanz/akb48/internal/types"
 )
 
 // CLIAdapter reads from stdin and writes to stdout.
@@ -211,8 +211,8 @@ import (
     tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
     "github.com/google/uuid"
 
-    "klawmbing/adapters"
-    "klawmbing/core"
+    "github.com/dydanz/akb48/adapters"
+    "github.com/dydanz/akb48/internal/types"
 )
 
 // Config holds Telegram-specific settings loaded from config.toml.
@@ -575,7 +575,7 @@ enabled   = false
 token_env = "DISCORD_BOT_TOKEN"
 ```
 
-Config is validated via a `pydantic`-equivalent struct using `go-validator` or hand-rolled checks in `core/config.go` (PRD-01). Startup fails immediately if `telegram.enabled = true` and `allowed_user_ids` is empty, or if the token env var is unset.
+Config is validated via `config.Validate() error` in PRD-01. Startup fails immediately if `telegram.enabled = true` and `allowed_user_ids` is empty, or if the token env var is unset.
 
 ---
 

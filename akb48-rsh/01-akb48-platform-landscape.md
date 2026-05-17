@@ -66,11 +66,17 @@
 - No equivalent to LangGraph's conditional graph execution for complex branching
 - Less framework protection for error handling/retries/state management
 - Minions handles 80% of background work but isn't Temporal
-- TypeScript/Bun stack (language mismatch if team is Go/Python)
+- TypeScript/Bun stack for OpenClaw/Hermes; AKB48 solves this by writing its own Go claw
 
 ### Decision for AKB48: GBrain-style
 
-**Rationale:** Solo operator. No team to manage platform complexity. The compounding brain effect is the killer feature — every interaction makes the next one better. Build a thin Python claw, use GBrain via MCP for the hard memory/knowledge work.
+**Rationale:** Solo operator. No team to manage platform complexity. The compounding brain effect is the killer feature — every interaction makes the next one better. Build a thin Go claw, use GBrain via MCP for the hard memory/knowledge work.
+
+**Why Go over Python for the runtime:**
+- Single statically-linked binary — `go build -o akb48 ./cmd/akb48/`. No venv, no pip, no dependency hell.
+- Goroutines + channels map cleanly onto the streaming architecture (token channel, concurrent adapters, post-turn hooks).
+- `context.Context` propagates cancellation through every layer — clean shutdown, per-request timeouts.
+- Operator's primary language. Compile-time type safety catches interface mismatches early.
 
 ---
 
@@ -106,9 +112,9 @@
 
 ## 4. Chat Interface Options
 
-### Custom bot (discord.py / python-telegram-bot / grammY)
-- Full control over message handling, threading, permissions
-- ~200 lines of adapter code per platform
+### Custom bot (go-telegram-bot-api / discordgo)
+- Full control over message handling, goroutines, allowlist enforcement
+- ~150-200 lines of adapter code per platform (Go is terse)
 - **For AKB48:** RECOMMENDED. The chat interface is your UX — own it
 
 ### Claude Code Channels
@@ -177,4 +183,4 @@ Telegram / Discord
       └── Compaction check (if session > N turns)
 ```
 
-~2,000-2,500 lines of Python. GBrain handles the brain. AKB48 handles everything else.
+~2,000-2,500 lines of Go. Single binary, no venv, no runtime dependencies. GBrain handles the brain. AKB48 handles everything else.

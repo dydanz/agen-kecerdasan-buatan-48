@@ -556,7 +556,7 @@ When the operator asks you to remember something:
 2. **Extract structured entity:**
    - `title`: one sentence, factual
    - `body`: 2–3 sentences with full context and rationale
-   - `tags`: 1–3 relevant domain tags (e.g., `["infra", "klawmbing"]`)
+   - `tags`: 1–3 relevant domain tags (e.g., `["infra", "github.com/dydanz/akb48"]`)
    - `scope`: `org` (default for all operator notes)
 
 3. **Call `gbrain_put`** with the structured entity.
@@ -733,8 +733,8 @@ systemPrompt, messages, err := r.assembler.Build(sess, msg.Text, coldContext)
 **Output format** (returned by `SearchEntities`):
 ```
 - Dandi decided to use PostgreSQL + pgvector for brain storage (decision, 2025-03-15)
-- GBrain serve must run before klawmbing starts (project:klawmbing)
-- Startup: gbrain serve → ./akb48 (project:klawmbing)
+- GBrain serve must run before akb48 starts (project:akb48)
+- Startup: gbrain serve → ./akb48 (project:akb48)
 ```
 
 ### Acceptance Criteria

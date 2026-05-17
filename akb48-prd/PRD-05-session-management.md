@@ -572,7 +572,7 @@ max_context_tokens        = 40000        # Phase 2: token budget for GetContextT
 load_on_startup           = true         # Load all session files at startup
 ```
 
-All fields are required. Fail fast at startup if any are missing (pydantic-equivalent: use a validated struct with `toml:"..."` tags and check zero values explicitly, or use a validation library like `go-playground/validator`).
+All fields are required. Fail fast at startup if any are missing — use a validated struct with `toml:"..."` tags and `config.Validate() error` (see PRD-01). Optional: `go-playground/validator` for declarative field constraints.
 
 ---
 
@@ -622,7 +622,7 @@ All fields are required. Fail fast at startup if any are missing (pydantic-equiv
 This is the complete flow when all five PRDs are implemented:
 
 ```
-1. Operator runs: go run ./akb48.go
+1. Operator runs: go run ./cmd/akb48/
    ├── config.toml loaded and validated (PRD-01)
    ├── LLM caller initialised with Anthropic SDK (PRD-01)
    ├── Tool registry created (PRD-01)

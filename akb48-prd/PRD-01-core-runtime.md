@@ -19,7 +19,7 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 
 ## 2. Goals
 
-- **G1:** A single `./akb48` binary (built with `go build -o klawmbing ./cmd/akb48/`) starts the entire runtime
+- **G1:** A single `./akb48` binary (built with `go build -o akb48 ./cmd/akb48/`) starts the entire runtime
 - **G2:** The runtime loads configuration from a TOML file (API keys, model config, adapter toggles)
 - **G3:** The LLM caller sends messages to the Claude API and streams tokens back via a channel
 - **G4:** Tool calls in the LLM response are dispatched to registered tool handlers
@@ -66,7 +66,7 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 ### 6.1 Directory Structure (this PRD's scope)
 
 ```
-klawmbing/
+akb48/
 ├── cmd/akb48/main.go       # Entry point: parse flags, load config, start runtime
 ├── internal/
 │   ├── config/config.go        # Config struct + TOML loader + validation
@@ -91,7 +91,7 @@ klawmbing/
 ### 6.2 Configuration Schema (config.toml)
 
 ```toml
-[klawmbing]
+[app]
 name = "AKB48"
 log_level = "INFO"                    # DEBUG | INFO | WARN | ERROR
 
@@ -136,9 +136,9 @@ identity_dir = "identity"
 ### 6.3 Go Module
 
 ```
-module github.com/dandi/klawmbing
+module github.com/dydanz/akb48
 
-go 1.23
+go 1.25
 ```
 
 **Key dependencies:**
@@ -392,7 +392,7 @@ func (r *AKB48Runtime) Shutdown(ctx context.Context) error
 //   ./akb48 --validate           — validate config and exit 0/1
 
 func main() {
-    flags := flag.NewFlagSet("klawmbing", flag.ExitOnError)
+    flags := flag.NewFlagSet("github.com/dydanz/akb48", flag.ExitOnError)
     configPath := flags.String("config", "config.toml", "path to config file")
     validateOnly := flags.Bool("validate", false, "validate config and exit")
     flags.Parse(os.Args[1:])

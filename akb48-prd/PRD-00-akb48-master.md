@@ -218,7 +218,7 @@ AKB48 follows the **"thin harness, fat skills"** pattern:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Runtime language | Python | Operator's familiarity, ecosystem depth, fast iteration |
+| Runtime language | Go 1.25 | Single binary, goroutines map cleanly to streaming architecture, compile-time safety |
 | Brain | GBrain via MCP | MIT-licensed, auto-wiring graph, dream cycle, 30+ tools |
 | Primary LLM | Claude Sonnet 4.6 | Best cost/quality for code + reasoning tasks |
 | Extraction LLM | Claude Haiku 4.5 | 12x cheaper, sufficient for fact extraction |
@@ -258,7 +258,7 @@ This master PRD decomposes into five sub-PRDs, each building toward "hello world
 
 All five sub-PRDs are complete when:
 
-1. Operator starts AKB48 with `python klawmbing.py`
+1. Operator starts AKB48 with `./akb48`
 2. GBrain MCP server is running (`gbrain serve`)
 3. Operator sends "Hello, who are you?" via Telegram
 4. AKB48 responds with a personality-consistent answer (from SOUL.md)
@@ -284,10 +284,14 @@ All five sub-PRDs are complete when:
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| Python | 3.11+ | Runtime |
-| python-telegram-bot | 21.x | Telegram adapter |
-| anthropic | latest | Claude API client |
-| gbrain | latest | Knowledge brain (via MCP) |
+| Go | 1.25+ | Runtime language — single statically-linked binary |
+| `anthropics/anthropic-sdk-go` | v1.38+ | Claude API client with streaming |
+| `go-telegram-bot-api/v5` | v5.7+ | Telegram adapter (long-polling) |
+| `BurntSushi/toml` | v1.4+ | TOML config parsing |
+| `google/uuid` | v1.6+ | Idempotency key generation |
+| `golang.org/x/sync` | v0.10+ | `errgroup` for post-turn hooks |
+| `gopkg.in/yaml.v3` | v3.0+ | SKILL.md frontmatter parsing |
+| gbrain | latest | Knowledge brain (via MCP stdio) |
 | PostgreSQL | 16+ | GBrain storage backend |
 | Docker + Docker Compose | latest | Container orchestration |
 | Tailscale | latest | Secure networking |
@@ -334,9 +338,9 @@ All five sub-PRDs are complete when:
 | TODO-003 | Skill resolver: keyword-based lookup table or lightweight classifier? Keyword is simpler but brittle with overlapping skills. | Architecture | **Decide before PRD-04 implementation.** Default: keyword table (start simple, migrate to classifier when 10+ skills) |
 | TODO-004 | Session compaction: what turn count triggers compaction? Too low = frequent summarization overhead. Too high = context window pressure. | Performance | **Decide during Phase 2.** Default: N=30 turns |
 | TODO-005 | Which GBrain version to target? v0.12+ has auto-wiring graph. Earlier versions have simpler setup. | Dependency | **Resolve before implementation.** Target latest stable |
-| TODO-006 | Python async framework: asyncio native or trio? python-telegram-bot uses asyncio. Need consistency across adapters. | Architecture | **Decide before PRD-01 implementation.** Default: asyncio (matches python-telegram-bot) |
-| TODO-007 | Config format: JSON, TOML, or YAML? Need to store API keys, channel tokens, model configs, skill paths. | Developer experience | Default: TOML (human-readable, typed, Python stdlib support via tomllib) |
-| TODO-008 | Discord adapter: discord.py or nextcord? discord.py is maintained again but had a hiatus. nextcord is the community fork. | Dependency | **Decide before Discord adapter implementation.** Default: discord.py (original, maintained) |
+| ~~TODO-006~~ | ~~Python async framework~~ | ~~Architecture~~ | **RESOLVED: Go. Goroutines + channels replace asyncio. `errgroup` for hook fan-out. `signal.NotifyContext` for graceful shutdown.** |
+| ~~TODO-007~~ | ~~Config format~~ | ~~Developer experience~~ | **RESOLVED: TOML via `github.com/BurntSushi/toml`. Typed Go structs with `toml:"..."` tags. `go-playground/validator` for struct validation.** |
+| ~~TODO-008~~ | ~~Discord adapter library~~ | ~~Dependency~~ | **RESOLVED (Phase 2): `github.com/bwmarrin/discordgo`. Same `ChannelAdapter` interface as Telegram.** |
 | TODO-009 | How to handle Telegram rate limits (30 msg/sec global, 1 msg/sec per chat for edits)? Need throttling for streaming responses. | Reliability | **Resolve during PRD-02 implementation.** Default: 1 edit per second for streaming |
 | TODO-010 | GBrain brain directory location: inside `~/.akb48/` or separate `~/brain/`? Affects backup strategy. | Operations | Default: `~/brain/` (independent lifecycle from claw runtime) |
 | TODO-011 | Operator identity: should USER.md be a gbrain page or a local file? If gbrain page, it's queryable by agents. If local, it's simpler but not searchable. | Architecture | Default: local file (simpler, loaded at startup, not agent-modifiable) |
@@ -375,7 +379,7 @@ All five sub-PRDs are complete when:
 | PRD-03: GBrain Integration | MCP client, knowledge query/store |
 | PRD-04: Identity & Skill System | AGENTS.md, SOUL.md, resolver |
 | PRD-05: Session Management | Persistence, session resolver, post-turn hooks |
-| 01-klawmbing-platform-landscape.md | Platform research and architecture decision |
-| 02-klawmbing-capabilities-memory.md | Agent capabilities and memory strategy |
-| 03-klawmbing-build-strategy-risks.md | Build phases, risks, cost model |
-| 05-klawmbing-reference-library.md | 100+ curated reference links |
+| 01-akb48-platform-landscape.md | Platform research and architecture decision |
+| 02-akb48-capabilities-memory.md | Agent capabilities and memory strategy |
+| 03-akb48-build-strategy-risks.md | Build phases, risks, cost model |
+| 05-akb48-reference-library.md | 100+ curated reference links |

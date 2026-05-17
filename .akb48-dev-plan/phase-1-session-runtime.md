@@ -758,7 +758,7 @@ func main() {
 
 ```bash
 # Build
-go build -o klawmbing ./cmd/akb48/
+go build -o akb48 ./cmd/akb48/
 
 # Validate test
 ANTHROPIC_API_KEY=test ./akb48 --validate
