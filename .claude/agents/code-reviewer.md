@@ -1,6 +1,7 @@
 ---
 name: code-reviewer
 description: AI code reviewer for GitHub PRs and local diffs. Reviews for correctness, security, performance, maintainability, test coverage, and project pattern adherence. Called automatically by NanoClaw pipeline after PR creation, or manually via `@NanoClaw review <pr_number>`.
+model: claude-sonnet-4-6
 ---
 
 # Code Reviewer Agent
