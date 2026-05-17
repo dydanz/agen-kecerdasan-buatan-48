@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dydanz/klawmbing/internal/config"
+	"github.com/dydanz/akb48/internal/config"
 )
 
 func TestLoad_ValidConfig(t *testing.T) {

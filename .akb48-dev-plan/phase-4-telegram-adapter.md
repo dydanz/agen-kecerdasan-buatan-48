@@ -1,6 +1,6 @@
 # Phase 4: Telegram Adapter
 
-**Goal:** The operator can chat with Klawmbing via Telegram on mobile. Responses stream token-by-token with a cursor animation. Only the operator's user ID can trigger the agent.
+**Goal:** The operator can chat with AKB48 via Telegram on mobile. Responses stream token-by-token with a cursor animation. Only the operator's user ID can trigger the agent.
 
 **Definition of Done:**
 - Telegram message from allowed user → response received on phone
@@ -24,7 +24,7 @@
 
 ### User Story
 
-> As an operator, I want to send messages to my Telegram bot and receive AI responses, so I can use Klawmbing from my phone without opening a terminal.
+> As an operator, I want to send messages to my Telegram bot and receive AI responses, so I can use AKB48 from my phone without opening a terminal.
 
 ### Implementation Plan
 
@@ -42,9 +42,9 @@ package telegram
 
 import (
     tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-    "github.com/dydanz/klawmbing/internal/config"
-    "github.com/dydanz/klawmbing/internal/runtime"
-    "github.com/dydanz/klawmbing/internal/types"
+    "github.com/dydanz/akb48/internal/config"
+    "github.com/dydanz/akb48/internal/runtime"
+    "github.com/dydanz/akb48/internal/types"
 )
 
 type TelegramAdapter struct {
@@ -330,7 +330,7 @@ func isFloodControl(err error) bool {
 }
 ```
 
-**Wire into entry point** — update `cmd/klawmbing/main.go` to start Telegram adapter when configured:
+**Wire into entry point** — update `cmd/akb48/main.go` to start Telegram adapter when configured:
 
 ```go
 if cfg.Adapters.Telegram.Enabled {
@@ -405,7 +405,7 @@ func TestSendStreaming_Overflow(t *testing.T) {
 **Manual test:**
 ```bash
 # Set TELEGRAM_BOT_TOKEN and add your user ID to allowed_user_ids
-TELEGRAM_BOT_TOKEN=... ./klawmbing
+TELEGRAM_BOT_TOKEN=... ./akb48
 # On phone: send "Tell me about the history of the internet in 500 words"
 # Observe: "▍" appears, then text streams in, cursor disappears at end
 ```

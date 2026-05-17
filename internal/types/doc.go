@@ -1,2 +1,2 @@
-// Package types defines shared data structures used across Klawmbing.
+// Package types defines shared data structures used across akb48.
 package types

@@ -3,7 +3,7 @@
 **Goal:** Prove the full end-to-end pipeline works — chat to LLM to brain to persistence — and deploy to a VPS so it runs 24/7 without the operator's laptop.
 
 **Definition of Done (PRD-00 §6):**
-1. `./klawmbing` starts — brain connected, skills loaded, adapters running
+1. `./akb48` starts — brain connected, skills loaded, adapters running
 2. Telegram: "Hello, who are you?" → personality-consistent response
 3. Telegram: "Remember that staging cluster is ap-southeast-1" → stored in GBrain
 4. Telegram: "What do you know about our staging cluster?" → retrieved from GBrain
@@ -44,8 +44,8 @@ import (
     "testing"
     "os"
 
-    "github.com/dydanz/klawmbing/internal/config"
-    "github.com/dydanz/klawmbing/internal/runtime"
+    "github.com/dydanz/akb48/internal/config"
+    "github.com/dydanz/akb48/internal/runtime"
 )
 
 // buildTestRuntime creates a fully-wired runtime with:
@@ -54,7 +54,7 @@ import (
 // - Real context assembler (from identity/ dir)
 // - Mock LLM caller (returns scripted responses)
 // - Mock GBrain bridge (records calls, returns scripted results)
-func buildTestRuntime(t *testing.T, opts ...testOption) *runtime.KlawmbingRuntime
+func buildTestRuntime(t *testing.T, opts ...testOption) *runtime.AKB48Runtime
 
 type mockLLMCaller struct {
     responses []string
@@ -241,14 +241,14 @@ go test ./tests/integration/... -v -timeout 60s
 
 ### Description
 
-Deploy Klawmbing to a Hetzner VPS with GBrain in Docker, systemd service for the Go binary, environment secrets in a restricted `.env` file, and a `Makefile` for repeatable deploys.
+Deploy AKB48 to a Hetzner VPS with GBrain in Docker, systemd service for the Go binary, environment secrets in a restricted `.env` file, and a `Makefile` for repeatable deploys.
 
 ### Implementation Plan
 
 **Files to create:**
 - `Makefile`
 - `docker-compose.yml` (GBrain + PostgreSQL)
-- `deploy/klawmbing.service` (systemd unit)
+- `deplo./akb48.service` (systemd unit)
 - `.env.example`
 - `scripts/healthcheck.sh`
 - `scripts/deploy.sh`
@@ -290,26 +290,26 @@ secrets:
     file: ./secrets/pg_password
 ```
 
-**deploy/klawmbing.service — systemd unit:**
+**deplo./akb48.service — systemd unit:**
 
 ```ini
 [Unit]
-Description=Klawmbing AI Agent Runtime
+Description=AKB48 AI Agent Runtime
 After=network.target docker.service
 Requires=docker.service
 
 [Service]
 Type=simple
 User=dandi
-WorkingDirectory=/home/dandi/klawmbing
+WorkingDirectory=/home/dand./akb48
 EnvironmentFile=/home/dandi/.env
-ExecStartPre=/home/dandi/klawmbing/klawmbing --validate
-ExecStart=/home/dandi/klawmbing/klawmbing
+ExecStartPre=/home/dand./akb48/akb48 --validate
+ExecStart=/home/dand./akb48/akb48
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=klawmbing
+SyslogIdentifier=akb48
 
 [Install]
 WantedBy=multi-user.target
@@ -318,15 +318,15 @@ WantedBy=multi-user.target
 **Makefile:**
 
 ```makefile
-BINARY=klawmbing
+BINARY=akb48
 VPS_USER=dandi
 VPS_HOST=<VPS_IP>
-VPS_DIR=/home/dandi/klawmbing
+VPS_DIR=/home/dand./akb48
 
 .PHONY: build test deploy logs restart validate
 
 build:
-	go build -o $(BINARY) ./cmd/klawmbing/
+	go build -o $(BINARY) ./cmd/akb48/
 
 test:
 	go test ./... -timeout 120s
@@ -336,25 +336,25 @@ validate: build
 
 deploy: build test
 	rsync -avz $(BINARY) config.toml identity/ skills/ $(VPS_USER)@$(VPS_HOST):$(VPS_DIR)/
-	ssh $(VPS_USER)@$(VPS_HOST) "sudo systemctl restart klawmbing"
-	@echo "Deployed. Check: ssh $(VPS_USER)@$(VPS_HOST) 'journalctl -u klawmbing -f'"
+	ssh $(VPS_USER)@$(VPS_HOST) "sudo systemctl restart akb48"
+	@echo "Deployed. Check: ssh $(VPS_USER)@$(VPS_HOST) 'journalctl -u akb48 -f'"
 
 logs:
-	ssh $(VPS_USER)@$(VPS_HOST) "journalctl -u klawmbing -f --no-pager"
+	ssh $(VPS_USER)@$(VPS_HOST) "journalctl -u akb48 -f --no-pager"
 
 restart:
-	ssh $(VPS_USER)@$(VPS_HOST) "sudo systemctl restart klawmbing"
+	ssh $(VPS_USER)@$(VPS_HOST) "sudo systemctl restart akb48"
 
 setup-vps:
 	ssh $(VPS_USER)@$(VPS_HOST) "mkdir -p $(VPS_DIR)/sessions $(VPS_DIR)/logs"
-	rsync -avz deploy/klawmbing.service $(VPS_USER)@$(VPS_HOST):/etc/systemd/system/
-	ssh $(VPS_USER)@$(VPS_HOST) "sudo systemctl daemon-reload && sudo systemctl enable klawmbing"
+	rsync -avz deplo./akb48.service $(VPS_USER)@$(VPS_HOST):/etc/systemd/system/
+	ssh $(VPS_USER)@$(VPS_HOST) "sudo systemctl daemon-reload && sudo systemctl enable akb48"
 ```
 
 **.env.example:**
 
 ```bash
-# Klawmbing environment variables
+# AKB48 environment variables
 # Copy to .env and fill in values. Never commit .env.
 ANTHROPIC_API_KEY=sk-ant-...
 TELEGRAM_BOT_TOKEN=...
@@ -365,16 +365,16 @@ TELEGRAM_BOT_TOKEN=...
 ```bash
 #!/bin/bash
 # Check that GBrain is responding
-docker exec klawmbing_gbrain_1 gbrain status 2>/dev/null
+docker exec akb48_gbrain_1 gbrain status 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "GBrain is not responding"
     exit 1
 fi
 
-# Check that klawmbing systemd service is active
-systemctl is-active --quiet klawmbing
+# Check that akb48 systemd service is active
+systemctl is-active --quiet akb48
 if [ $? -ne 0 ]; then
-    echo "klawmbing service is not active"
+    echo "akb48 service is not active"
     exit 1
 fi
 
@@ -386,10 +386,10 @@ exit 0
 
 - [ ] `make deploy` builds, runs tests, rsyncs to VPS, restarts service
 - [ ] Deploy fails if `go test ./...` fails (tests are a deploy gate)
-- [ ] `ExecStartPre=./klawmbing --validate` in systemd — deploy aborts if config invalid
-- [ ] `systemctl status klawmbing` shows `active (running)` after deploy
+- [ ] `ExecStartPre=./akb48 --validate` in systemd — deploy aborts if config invalid
+- [ ] `systemctl status akb48` shows `active (running)` after deploy
 - [ ] GBrain container starts automatically on VPS boot
-- [ ] `journalctl -u klawmbing -f` shows structured slog output
+- [ ] `journalctl -u akb48 -f` shows structured slog output
 - [ ] Process killed by systemd → restarts within 5s (`RestartSec=5`)
 - [ ] **Hello World end-to-end manual test passes** (PRD-00 §6, all 6 steps)
 - [ ] Binary runs 24h without crash on VPS
@@ -402,12 +402,12 @@ exit 0
 make deploy
 
 # 2. Check service
-ssh dandi@VPS "systemctl status klawmbing"
+ssh dandi@VPS "systemctl status akb48"
 # Expected: active (running)
 
 # 3. Check logs
-ssh dandi@VPS "journalctl -u klawmbing --since '1 min ago'"
-# Expected: "Klawmbing started adapters=CLI,Telegram brain=connected"
+ssh dandi@VPS "journalctl -u akb48 --since '1 min ago'"
+# Expected: "AKB48 started adapters=CLI,Telegram brain=connected"
 
 # 4. Send Telegram message
 # "Hello, who are you?"
@@ -420,7 +420,7 @@ ssh dandi@VPS "journalctl -u klawmbing --since '1 min ago'"
 # Expected: references ap-southeast-1
 
 # 6. Restart resilience
-ssh dandi@VPS "sudo systemctl restart klawmbing"
+ssh dandi@VPS "sudo systemctl restart akb48"
 # Wait 5 seconds
 # "What did I just ask you to remember?"
 # Expected: recalls staging cluster from loaded session

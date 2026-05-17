@@ -1,4 +1,4 @@
-# Klawmbing — Development Plan
+# AKB48 — Development Plan
 
 **Last Updated:** 2026-05-01
 **Language:** Go
@@ -8,15 +8,15 @@
 
 ## Overview
 
-Klawmbing is a thin, self-hosted Go AI agent runtime that connects Telegram/Discord to a compounding knowledge brain (GBrain). This plan decomposes the Hello World milestone into 21 GitHub-ready tickets across 6 phases.
+AKB48 is a thin, self-hosted Go AI agent runtime that connects Telegram/Discord to a compounding knowledge brain (GBrain). This plan decomposes the Hello World milestone into 21 GitHub-ready tickets across 6 phases.
 
 **Hello World Definition of Done (PRD-00 §6):**
-1. Operator starts Klawmbing: `./klawmbing`
+1. Operator starts AKB48: `./akb48`
 2. GBrain is running: `gbrain serve`
 3. Operator sends "Hello, who are you?" via Telegram → personality-consistent response
 4. Operator sends "Remember that staging cluster is ap-southeast-1" → stored in GBrain
 5. Operator sends "What do you know about our staging cluster?" → retrieved from GBrain
-6. Operator restarts Klawmbing → previous session context available
+6. Operator restarts AKB48 → previous session context available
 
 ---
 

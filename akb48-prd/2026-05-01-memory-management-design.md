@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-The Klawmbing PRDs (01–05) correctly establish a layered memory model (brain, session, identity, skills) but leave four gaps that limit effectiveness and inflate cost:
+The AKB48 PRDs (01–05) correctly establish a layered memory model (brain, session, identity, skills) but leave four gaps that limit effectiveness and inflate cost:
 
 1. Session history is sent uncached every turn — the largest token block, with no cache strategy
 2. Cold sessions start dumb — the agent has to discover what it knows via tool-call round trips
@@ -101,8 +101,8 @@ Default threshold: 30 minutes. Configurable via `session.cold_resume_threshold_m
 ```
 [What I recall that may be relevant]
 - Dandi decided to use PostgreSQL + pgvector for brain storage (decision, 2025-03-15)
-- GBrain serve must be running before klawmbing starts (project:klawmbing)
-- Startup sequence: gbrain serve → ./klawmbing (project:klawmbing)
+- GBrain serve must be running before akb48 starts (project:akb48)
+- Startup sequence: gbrain serve → ./akb48 (project:akb48)
 ```
 
 4. On subsequent turns, `isCold` naturally evaluates to `false`: `TurnCount() > 0` and `UpdatedAt` is recent. No extra flag required. Tier 3 is omitted automatically.
@@ -124,9 +124,9 @@ Cold opens are rare (once per session). At that frequency, Haiku adds ~200ms and
 | Type | What it captures | Example |
 |------|-----------------|---------|
 | `person` | Team members — role, timezone, working style | "Andi — backend lead, UTC+8, Go-primary" |
-| `project` | Active and past projects — status, tech stack | "klawmbing — self-hosted agent runtime, Go, planning phase" |
+| `project` | Active and past projects — status, tech stack | "github.com/dydanz/akb48 — self-hosted agent runtime, Go, planning phase" |
 | `decision` | Architectural/product/business decisions with rationale | "Chose stdio MCP over HTTP SSE — simpler, co-located VPS" |
-| `product` | Products you operate or build, their boundaries | "GBrain — knowledge brain, separate lifecycle from klawmbing" |
+| `product` | Products you operate or build, their boundaries | "GBrain — knowledge brain, separate lifecycle from akb48" |
 | `policy` | Standing rules and constraints | "Never push to main — always PRs, always human approval" |
 
 ### Entity schema
@@ -136,7 +136,7 @@ Cold opens are rare (once per session). At that frequency, Haiku adds ~200ms and
   "type": "decision",
   "title": "Chose PostgreSQL + pgvector for brain storage",
   "body": "Selected over purpose-built vector DBs. GBrain handles all indexing. Hybrid search: vector + keyword + graph.",
-  "tags": ["klawmbing", "gbrain", "infra"],
+  "tags": ["github.com/dydanz/akb48", "gbrain", "infra"],
   "scope": "org",
   "created_at": "2025-03-15T10:00:00Z"
 }

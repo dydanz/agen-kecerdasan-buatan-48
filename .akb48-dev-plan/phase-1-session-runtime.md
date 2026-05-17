@@ -3,7 +3,7 @@
 **Goal:** A working CLI agent with persistent session history. The operator can type a message, receive a response, restart the process, and see prior conversation context loaded automatically.
 
 **Definition of Done:**
-- `./klawmbing` starts and accepts messages via CLI
+- `./akb48` starts and accepts messages via CLI
 - Multi-turn conversations work (agent recalls earlier turns)
 - Restarting the process loads the previous session from disk
 - Graceful shutdown on `Ctrl+C`
@@ -45,7 +45,7 @@ import (
     "encoding/json"
     "sync"
     "time"
-    "github.com/dydanz/klawmbing/internal/types"
+    "github.com/dydanz/akb48/internal/types"
 )
 
 type ToolCallRecord struct {
@@ -375,7 +375,7 @@ func TestLogMetricsHook(t *testing.T) {
 
 ---
 
-## KLW-007 — KlawmbingRuntime & HandleMessage
+## KLW-007 — AKB48Runtime & HandleMessage
 
 **Type:** Chore
 **Owner:** Backend
@@ -400,7 +400,7 @@ The central runtime that wires all components together. `HandleMessage` is the p
 // MessageHandler is the function signature adapters call per incoming message.
 type MessageHandler func(ctx context.Context, msg types.Message, tokens chan<- string) error
 
-type KlawmbingRuntime struct {
+type AKB48Runtime struct {
     cfg            *config.Config
     llmCaller      *llm.Caller
     registry       *tools.Registry
@@ -415,18 +415,18 @@ type ContextAssembler interface {
     Build(sess *session.Session, userMessage string, coldContext string) (systemPrompt string, messages []types.LLMMessage, err error)
 }
 
-func NewRuntime(cfg *config.Config) (*KlawmbingRuntime, error)
+func NewRuntime(cfg *config.Config) (*AKB48Runtime, error)
 
-func (r *KlawmbingRuntime) HandleMessage(ctx context.Context, msg types.Message, tokens chan<- string) error
+func (r *AKB48Runtime) HandleMessage(ctx context.Context, msg types.Message, tokens chan<- string) error
 
-func (r *KlawmbingRuntime) Start(ctx context.Context) error
+func (r *AKB48Runtime) Start(ctx context.Context) error
 
-func (r *KlawmbingRuntime) Stop() error
+func (r *AKB48Runtime) Stop() error
 ```
 
 **HandleMessage flow:**
 ```go
-func (r *KlawmbingRuntime) HandleMessage(ctx context.Context, msg types.Message, tokens chan<- string) error {
+func (r *AKB48Runtime) HandleMessage(ctx context.Context, msg types.Message, tokens chan<- string) error {
     start := time.Now()
 
     // 1. Resolve session
@@ -487,15 +487,15 @@ func (s *stubAssembler) Build(sess *session.Session, userMessage, coldContext st
 
 **Start and Stop:**
 ```go
-func (r *KlawmbingRuntime) Start(ctx context.Context) error {
+func (r *AKB48Runtime) Start(ctx context.Context) error {
     if err := r.sessionManager.LoadAll(ctx); err != nil {
         return fmt.Errorf("load sessions: %w", err)
     }
-    slog.Info("Klawmbing started", "sessions_loaded", ...)
+    slog.Info("AKB48 started", "sessions_loaded", ...)
     return nil
 }
 
-func (r *KlawmbingRuntime) Stop() error {
+func (r *AKB48Runtime) Stop() error {
     return r.sessionManager.Shutdown()
 }
 ```
@@ -550,7 +550,7 @@ func TestRuntime_MultiTurnContext(t *testing.T) {
 
 ### User Story
 
-> As an operator, I want to run `./klawmbing` and interact with the agent via a terminal prompt, so I can develop and test without needing Telegram.
+> As an operator, I want to run `./akb48` and interact with the agent via a terminal prompt, so I can develop and test without needing Telegram.
 
 ### Implementation Plan
 
@@ -626,7 +626,7 @@ func (a *CLIAdapter) Start(ctx context.Context) error {
 
 ### Acceptance Criteria
 
-- [ ] `./klawmbing` prints `> ` prompt and waits for input
+- [ ] `./akb48` prints `> ` prompt and waits for input
 - [ ] Typing "hello" → handler called → response printed to stdout
 - [ ] Empty input (just Enter) → skipped, prompt shown again
 - [ ] Multi-turn: second message includes first turn in context
@@ -670,11 +670,11 @@ func TestCLIAdapter_EmptyLineSkipped(t *testing.T) {
 
 ### Description
 
-Replace the stub `cmd/klawmbing/main.go` with the full entry point: flag parsing, config loading, runtime wiring, signal handling, and graceful shutdown.
+Replace the stub `cmd/akb48/main.go` with the full entry point: flag parsing, config loading, runtime wiring, signal handling, and graceful shutdown.
 
 ### Implementation Plan
 
-**File to modify:** `cmd/klawmbing/main.go`
+**File to modify:** `cmd/akb48/main.go`
 
 ```go
 package main
@@ -688,9 +688,9 @@ import (
     "os/signal"
     "syscall"
 
-    "github.com/dydanz/klawmbing/internal/config"
-    "github.com/dydanz/klawmbing/internal/runtime"
-    "github.com/dydanz/klawmbing/adapters/cli"
+    "github.com/dydanz/akb48/internal/config"
+    "github.com/dydanz/akb48/internal/runtime"
+    "github.com/dydanz/akb48/adapters/cli"
 )
 
 func main() {
@@ -746,31 +746,31 @@ func main() {
 
 ### Acceptance Criteria
 
-- [ ] `./klawmbing --validate` exits 0 with "Config OK" when config + env vars valid
-- [ ] `./klawmbing --validate` exits 1 with clear error when `ANTHROPIC_API_KEY` not set
-- [ ] `./klawmbing --config nonexistent.toml` exits 1 with clear error
-- [ ] `./klawmbing` starts and prints `> ` prompt
+- [ ] `./akb48 --validate` exits 0 with "Config OK" when config + env vars valid
+- [ ] `./akb48 --validate` exits 1 with clear error when `ANTHROPIC_API_KEY` not set
+- [ ] `./akb48 --config nonexistent.toml` exits 1 with clear error
+- [ ] `./akb48` starts and prints `> ` prompt
 - [ ] `Ctrl+C` → "Shutting down..." → "Shutdown complete" logged → clean exit
-- [ ] `go build ./cmd/klawmbing/` produces a binary under 30MB
+- [ ] `go build ./cmd/akb48/` produces a binary under 30MB
 - [ ] **End-to-end Phase 1 smoke test:** start binary, send "hello", receive response, `Ctrl+C`, verify session JSONL written
 
 ### Testing Plan
 
 ```bash
 # Build
-go build -o klawmbing ./cmd/klawmbing/
+go build -o akb48 ./cmd/akb48/
 
 # Validate test
-ANTHROPIC_API_KEY=test ./klawmbing --validate
+ANTHROPIC_API_KEY=test ./akb48 --validate
 echo $?  # expect 0
 
 # Missing key test
 unset ANTHROPIC_API_KEY
-./klawmbing --validate
+./akb48 --validate
 echo $?  # expect 1
 
 # Manual smoke test (requires real API key)
-ANTHROPIC_API_KEY=sk-ant-... ./klawmbing
+ANTHROPIC_API_KEY=sk-ant-... ./akb48
 # Type: hello
 # Expect: response text
 # Ctrl+C

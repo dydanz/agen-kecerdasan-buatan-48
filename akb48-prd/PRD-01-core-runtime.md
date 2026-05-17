@@ -1,7 +1,7 @@
 # PRD-01: Core Runtime & Message Loop
 
 **Status:** Draft v1.0
-**Parent:** PRD-00 (Klawmbing Master PRD)
+**Parent:** PRD-00 (AKB48 Master PRD)
 **Author:** Dandi
 **Created:** April 26, 2026
 **Dependencies:** None (this is the foundation)
@@ -11,7 +11,7 @@
 
 ## 1. Problem
 
-Klawmbing needs a core process that starts up, loads configuration, accepts messages from any channel adapter, sends them to the Claude API, executes tool calls in the response, and returns results. Without this core loop, nothing else works.
+AKB48 needs a core process that starts up, loads configuration, accepts messages from any channel adapter, sends them to the Claude API, executes tool calls in the response, and returns results. Without this core loop, nothing else works.
 
 This PRD covers the minimum viable runtime: the entry point, configuration loader, LLM caller with streaming, tool execution dispatcher, and the interface contracts that all other components (adapters, skills, sessions) plug into.
 
@@ -19,7 +19,7 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 
 ## 2. Goals
 
-- **G1:** A single `./klawmbing` binary (built with `go build -o klawmbing ./cmd/klawmbing/`) starts the entire runtime
+- **G1:** A single `./akb48` binary (built with `go build -o akb48 ./cmd/akb48/`) starts the entire runtime
 - **G2:** The runtime loads configuration from a TOML file (API keys, model config, adapter toggles)
 - **G3:** The LLM caller sends messages to the Claude API and streams tokens back via a channel
 - **G4:** Tool calls in the LLM response are dispatched to registered tool handlers
@@ -42,7 +42,7 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 | Actor | Role in this PRD |
 |-------|-----------------|
 | Operator | Starts the runtime, provides config, sends test messages via CLI adapter |
-| Klawmbing Runtime | Loads config, initializes components, runs the message loop |
+| AKB48 Runtime | Loads config, initializes components, runs the message loop |
 | Claude API | Receives prompts, returns streaming responses with optional tool calls |
 | Tool Handlers | Execute side effects (gbrain, shell, web search) when the LLM requests them |
 
@@ -52,7 +52,7 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 
 | ID | Story | Acceptance Criteria |
 |----|-------|-------------------|
-| US-R01 | As an operator, I run `./klawmbing` and the process starts without errors | Process starts, logs "Klawmbing started" with loaded config summary (model, adapters enabled) |
+| US-R01 | As an operator, I run `./akb48` and the process starts without errors | Process starts, logs "AKB48 started" with loaded config summary (model, adapters enabled) |
 | US-R02 | As an operator, I provide a config.toml with my Anthropic API key and model preferences | Runtime reads config, validates required fields, fails fast with clear error if API key is missing |
 | US-R03 | As an operator, I send a message through any adapter and receive a streamed response | First token arrives in < 2s, full response streams to the adapter's `Send()` method |
 | US-R04 | As an operator, if the LLM returns a tool_use block, the registered handler is called | Tool handler receives the tool name + input, returns result, and the LLM continues with the tool result |
@@ -66,11 +66,11 @@ This PRD covers the minimum viable runtime: the entry point, configuration loade
 ### 6.1 Directory Structure (this PRD's scope)
 
 ```
-klawmbing/
-├── cmd/klawmbing/main.go       # Entry point: parse flags, load config, start runtime
+akb48/
+├── cmd/akb48/main.go       # Entry point: parse flags, load config, start runtime
 ├── internal/
 │   ├── config/config.go        # Config struct + TOML loader + validation
-│   ├── runtime/runtime.go      # KlawmbingRuntime — wires all components, message loop
+│   ├── runtime/runtime.go      # AKB48Runtime — wires all components, message loop
 │   ├── llm/llm.go              # LLMCaller — SDK wrapper, streaming, tool loop
 │   ├── tools/tools.go          # ToolRegistry — register/dispatch/log
 │   └── types/types.go          # Shared types: Message, Response, ToolCall, ToolResult, TokenUsage
@@ -91,8 +91,8 @@ klawmbing/
 ### 6.2 Configuration Schema (config.toml)
 
 ```toml
-[klawmbing]
-name = "Klawmbing"
+[app]
+name = "AKB48"
 log_level = "INFO"                    # DEBUG | INFO | WARN | ERROR
 
 [llm]
@@ -136,9 +136,9 @@ identity_dir = "identity"
 ### 6.3 Go Module
 
 ```
-module github.com/dandi/klawmbing
+module github.com/dydanz/akb48
 
-go 1.23
+go 1.25
 ```
 
 **Key dependencies:**
@@ -342,8 +342,8 @@ return assembled Response
 ### 6.8 Runtime Orchestration (internal/runtime/runtime.go)
 
 ```go
-// KlawmbingRuntime wires all components together and owns the message loop.
-type KlawmbingRuntime struct {
+// AKB48Runtime wires all components together and owns the message loop.
+type AKB48Runtime struct {
     cfg        config.Config
     llm        *llm.LLMCaller
     tools      *tools.ToolRegistry
@@ -351,7 +351,7 @@ type KlawmbingRuntime struct {
     // session manager added by PRD-05; context assembler added by PRD-04
 }
 
-func NewKlawmbingRuntime(cfg config.Config) (*KlawmbingRuntime, error)
+func NewAKB48Runtime(cfg config.Config) (*AKB48Runtime, error)
 
 // Start initializes all components and launches each adapter in its own goroutine.
 // Returns when ctx is cancelled (graceful shutdown) or a fatal error occurs.
@@ -363,7 +363,7 @@ func NewKlawmbingRuntime(cfg config.Config) (*KlawmbingRuntime, error)
 //  4. Load identity files (PRD-04)
 //  5. Start enabled channel adapters (each in its own goroutine)
 //  6. Log startup summary (model, adapters enabled, tool count)
-func (r *KlawmbingRuntime) Start(ctx context.Context) error
+func (r *AKB48Runtime) Start(ctx context.Context) error
 
 // HandleMessage is the core loop invoked by channel adapters for every inbound message.
 //
@@ -375,24 +375,24 @@ func (r *KlawmbingRuntime) Start(ctx context.Context) error
 //  6. Run post-turn hooks via errgroup (session persist + metrics log)
 //     — hook errors are logged, never propagated
 //  7. Log completion metrics (session_id, tokens, latency, tool call count)
-func (r *KlawmbingRuntime) HandleMessage(ctx context.Context, msg types.Message) error
+func (r *AKB48Runtime) HandleMessage(ctx context.Context, msg types.Message) error
 
 // Shutdown stops all adapters, flushes in-flight logs, and closes connections.
-func (r *KlawmbingRuntime) Shutdown(ctx context.Context) error
+func (r *AKB48Runtime) Shutdown(ctx context.Context) error
 ```
 
 **Post-turn hooks** use `golang.org/x/sync/errgroup`. Each hook is a goroutine; the group is started with a fresh context so a hook timeout does not propagate to the next message. All `error` returns from hooks are logged at ERROR level and discarded.
 
-### 6.9 Entry Point (cmd/klawmbing/main.go)
+### 6.9 Entry Point (cmd/akb48/main.go)
 
 ```go
 // Usage:
-//   ./klawmbing                      — start with default config.toml
-//   ./klawmbing --config path.toml   — start with custom config
-//   ./klawmbing --validate           — validate config and exit 0/1
+//   ./akb48                      — start with default config.toml
+//   ./akb48 --config path.toml   — start with custom config
+//   ./akb48 --validate           — validate config and exit 0/1
 
 func main() {
-    flags := flag.NewFlagSet("klawmbing", flag.ExitOnError)
+    flags := flag.NewFlagSet("github.com/dydanz/akb48", flag.ExitOnError)
     configPath := flags.String("config", "config.toml", "path to config file")
     validateOnly := flags.Bool("validate", false, "validate config and exit")
     flags.Parse(os.Args[1:])
@@ -410,7 +410,7 @@ func main() {
     ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
     defer cancel()
 
-    rt, err := runtime.NewKlawmbingRuntime(cfg)
+    rt, err := runtime.NewAKB48Runtime(cfg)
     if err != nil {
         slog.Error("runtime init failed", "err", err)
         os.Exit(1)
@@ -455,7 +455,7 @@ Configure a `slog.JSONHandler` at startup using the `log_level` from config:
 
 ```go
 level := slog.LevelInfo // default
-switch strings.ToUpper(cfg.Klawmbing.LogLevel) {
+switch strings.ToUpper(cfg.AKB48.LogLevel) {
 case "DEBUG": level = slog.LevelDebug
 case "WARN":  level = slog.LevelWarn
 case "ERROR": level = slog.LevelError
@@ -500,7 +500,7 @@ Tool input is intentionally omitted from the log line (may contain secrets). If 
 
 ### Console output (stderr)
 
-- **Startup:** `Klawmbing started model=... adapters=[cli] tools=0`
+- **Startup:** `AKB48 started model=... adapters=[cli] tools=0`
 - **Per-message completion:** `turn complete session_id=... tokens=... latency_ms=... tool_calls=N`
 - **Errors:** Full error chain via `fmt.Errorf("context: %w", err)` unwrapping; message content truncated to 200 chars
 
@@ -508,8 +508,8 @@ Tool input is intentionally omitted from the log line (may contain secrets). If 
 
 ## 9. Acceptance Criteria (Definition of Done)
 
-- [ ] `./klawmbing` starts without errors with a valid `config.toml`
-- [ ] `./klawmbing --validate` checks config and exits 0 on success, 1 on failure
+- [ ] `./akb48` starts without errors with a valid `config.toml`
+- [ ] `./akb48 --validate` checks config and exits 0 on success, 1 on failure
 - [ ] Missing `ANTHROPIC_API_KEY` causes an immediate, clear error before any network call
 - [ ] CLI adapter (implemented as the simplest possible adapter in PRD-02) can send a message and receive a streamed response via `tokenCh`
 - [ ] If a tool handler is registered and the LLM invokes it, the handler runs and the LLM receives the result in the next round

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/dydanz/klawmbing/internal/types"
+	"github.com/dydanz/akb48/internal/types"
 )
 
 // ToolHandler is the function signature for all registered tool implementations.

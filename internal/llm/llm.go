@@ -12,9 +12,9 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 	"github.com/google/uuid"
 
-	"github.com/dydanz/klawmbing/internal/config"
-	"github.com/dydanz/klawmbing/internal/tools"
-	"github.com/dydanz/klawmbing/internal/types"
+	"github.com/dydanz/akb48/internal/config"
+	"github.com/dydanz/akb48/internal/tools"
+	"github.com/dydanz/akb48/internal/types"
 )
 
 // CallParams holds input for a single Call invocation.

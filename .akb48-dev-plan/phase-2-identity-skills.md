@@ -3,7 +3,7 @@
 **Goal:** The agent has a defined personality, routes messages to skill files, and assembles prompts with 4-tier caching. Adding a new capability means writing a markdown file — no code changes.
 
 **Definition of Done:**
-- Agent responds with Klawmbing personality (from SOUL.md) on "Who are you?"
+- Agent responds with AKB48 personality (from SOUL.md) on "Who are you?"
 - "remember that X" → `note-capture` skill injected in prompt
 - "research Y" → `research` skill injected in prompt
 - Prompt caching is active — Tier 1 (identity) and Tier 2 (session history) marked with `cache_control`
@@ -477,9 +477,9 @@ You are a sharp, opinionated technical co-founder.
 - Cloud: self-hosted first, cloud when unavoidable
 
 ## Current Focus
-- Building Klawmbing as personal AI infrastructure
+- Building AKB48 as personal AI infrastructure
 - Goal: reduce cognitive overhead of solo operator role
-- Key projects: Klawmbing runtime, GBrain integration
+- Key projects: AKB48 runtime, GBrain integration
 ```
 
 ### Acceptance Criteria
@@ -494,7 +494,7 @@ You are a sharp, opinionated technical co-founder.
 
 ```bash
 # Manual test after Phase 2 wiring
-./klawmbing
+./akb48
 > Who are you?
 # Expect: direct intro referencing role as technical co-founder, no emojis
 > What is my Anthropic API key?
@@ -556,7 +556,7 @@ When the operator asks you to remember something:
 2. **Extract structured entity:**
    - `title`: one sentence, factual
    - `body`: 2–3 sentences with full context and rationale
-   - `tags`: 1–3 relevant domain tags (e.g., `["infra", "klawmbing"]`)
+   - `tags`: 1–3 relevant domain tags (e.g., `["infra", "github.com/dydanz/akb48"]`)
    - `scope`: `org` (default for all operator notes)
 
 3. **Call `gbrain_put`** with the structured entity.
@@ -717,7 +717,7 @@ func extractQuery(message string) string {
 }
 ```
 
-**Wire into KlawmbingRuntime.HandleMessage:**
+**Wire into AKB48Runtime.HandleMessage:**
 
 ```go
 // In HandleMessage, before Build():
@@ -733,8 +733,8 @@ systemPrompt, messages, err := r.assembler.Build(sess, msg.Text, coldContext)
 **Output format** (returned by `SearchEntities`):
 ```
 - Dandi decided to use PostgreSQL + pgvector for brain storage (decision, 2025-03-15)
-- GBrain serve must run before klawmbing starts (project:klawmbing)
-- Startup: gbrain serve → ./klawmbing (project:klawmbing)
+- GBrain serve must run before akb48 starts (project:akb48)
+- Startup: gbrain serve → ./akb48 (project:akb48)
 ```
 
 ### Acceptance Criteria

@@ -427,7 +427,7 @@ func TestSearchEntities_Unavailable(t *testing.T) {
 
 ### Description
 
-Wire `GBrainBridge` into `KlawmbingRuntime`'s startup sequence. Handle all failure modes (brain disabled, not installed, unavailable) so the agent always works in some form.
+Wire `GBrainBridge` into `AKB48Runtime`'s startup sequence. Handle all failure modes (brain disabled, not installed, unavailable) so the agent always works in some form.
 
 ### Implementation Plan
 
@@ -436,7 +436,7 @@ Wire `GBrainBridge` into `KlawmbingRuntime`'s startup sequence. Handle all failu
 **NewRuntime brain wiring:**
 
 ```go
-func NewRuntime(cfg *config.Config) (*KlawmbingRuntime, error) {
+func NewRuntime(cfg *config.Config) (*AKB48Runtime, error) {
     registry := tools.NewRegistry()
     llmCaller := llm.NewCaller(cfg, registry)
     sessionManager := session.NewSessionManager(cfg.Session)
@@ -455,24 +455,24 @@ func NewRuntime(cfg *config.Config) (*KlawmbingRuntime, error) {
     }
 
     // ... assemble cold opener, assembler, etc.
-    slog.Info("Klawmbing initialised",
+    slog.Info("AKB48 initialised",
         "brain", brainStatus,
         "skills_dir", cfg.Skills.Dir,
     )
 
-    return &KlawmbingRuntime{...}, nil
+    return &AKB48Runtime{...}, nil
 }
 ```
 
 **Startup banner format:**
 ```
-INFO Klawmbing started adapters=CLI brain="connected (32 tools)" skills=2
+INFO AKB48 started adapters=CLI brain="connected (32 tools)" skills=2
 ```
 
 **Degraded mode rules:**
 - `brain.enabled = false` → `GBrainBridge` never created; tools not registered; LLM operates without brain
 - Brain starts but crashes mid-session → `available.Store(false)` → `gbrain_*` handlers return error string → LLM tells user brain is unavailable
-- Brain auto-restarts → `available.Store(true)` → tools work again without restarting Klawmbing
+- Brain auto-restarts → `available.Store(true)` → tools work again without restarting AKB48
 
 **LLM behavior in degraded mode** — the system prompt (AGENTS.md) must include:
 
@@ -483,7 +483,7 @@ INFO Klawmbing started adapters=CLI brain="connected (32 tools)" skills=2
 - [ ] `brain.enabled = false` → startup succeeds, banner: `"Brain: disabled"`
 - [ ] `gbrain` not in PATH → startup succeeds with `slog.Warn`, banner: `"Brain: degraded (unavailable)"`
 - [ ] Brain goes down mid-session → next message returns response (without brain), no crash
-- [ ] Brain comes back (auto-restart) → `gbrain_*` tools work again, no Klawmbing restart needed
+- [ ] Brain comes back (auto-restart) → `gbrain_*` tools work again, no AKB48 restart needed
 - [ ] Degraded warning logged at most once per 60s (not on every tool call)
 - [ ] `go test ./internal/runtime/... -run TestDegraded` passes
 

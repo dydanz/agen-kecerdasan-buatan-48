@@ -1,7 +1,7 @@
 # PRD-05: Session Management & Persistence
 
 **Status:** Draft v2.0 (Go)
-**Parent:** PRD-00 (Klawmbing Master PRD)
+**Parent:** PRD-00 (AKB48 Master PRD)
 **Author:** Dandi
 **Created:** April 26, 2026
 **Revised:** May 1, 2026
@@ -12,7 +12,7 @@
 
 ## 1. Problem
 
-Without session management, every message is independent — the agent has no memory of what was said 5 minutes ago. Without persistence, restarting Klawmbing erases all conversation context. Without post-turn hooks, there's no place to extract facts for the brain or trigger compaction.
+Without session management, every message is independent — the agent has no memory of what was said 5 minutes ago. Without persistence, restarting AKB48 erases all conversation context. Without post-turn hooks, there's no place to extract facts for the brain or trigger compaction.
 
 This PRD covers:
 - Session resolution (which session does this message belong to?)
@@ -27,7 +27,7 @@ This PRD covers:
 - **G1:** Each message is associated with a session that maintains conversation history
 - **G2:** Session history is sent to the LLM as message context (the LLM "remembers" the conversation)
 - **G3:** Sessions persist to disk as JSONL files and survive process restarts
-- **G4:** On startup, Klawmbing loads the most recent session per session ID and resumes
+- **G4:** On startup, AKB48 loads the most recent session per session ID and resumes
 - **G5:** Post-turn hooks run after every agent response (persist session, log metrics)
 - **G6:** Session state is bounded — old turns are available but the architecture supports future compaction
 
@@ -46,7 +46,7 @@ This PRD covers:
 | ID | Story | Acceptance Criteria |
 |----|-------|-------------------|
 | US-P01 | As an operator, I send multiple messages and the agent remembers what I said earlier in the conversation | Message 1: "Our database is Postgres 16." Message 5: "What database are we using?" -> "Postgres 16." |
-| US-P02 | As an operator, I restart Klawmbing and my conversation context is preserved | After restart, ask "What did I just tell you about the database?" -> Agent recalls from loaded session. |
+| US-P02 | As an operator, I restart AKB48 and my conversation context is preserved | After restart, ask "What did I just tell you about the database?" -> Agent recalls from loaded session. |
 | US-P03 | As an operator, my Telegram session and CLI session are independent | Facts shared in CLI don't appear in Telegram session history (they may appear via brain if stored). |
 | US-P04 | As a developer, I can inspect a session file to see the full conversation history | JSONL file contains human-readable entries with role, content, timestamp, and tool calls. |
 | US-P05 | As a developer, post-turn hooks run reliably after every response | Hook logs confirm execution. If a hook fails, the error is logged but doesn't affect the user response. |
@@ -140,7 +140,7 @@ func (s *Session) AddTurn(turn SessionTurn) {
 
 // SessionConfig is the parsed [session] block from config.toml.
 type SessionConfig struct {
-    StorageDir              string `toml:"storage_dir"`               // relative to ~/.klawmbing/
+    StorageDir              string `toml:"storage_dir"`               // relative to ~/.akb48/
     MaxTurnsInContext       int    `toml:"max_turns_in_context"`       // default: 50
     MaxTurnsBeforeCompaction int   `toml:"max_turns_before_compaction"` // Phase 2; default: 30
     MaxFileSizeMB           int    `toml:"max_file_size_mb"`           // warn threshold; default: 10
@@ -200,7 +200,7 @@ func (m *SessionManager) Shutdown()
 
 Each session is stored as a JSONL file: one JSON object per line.
 
-**File location:** `~/.klawmbing/sessions/{session_id_sanitized}.jsonl`
+**File location:** `~/.akb48/sessions/{session_id_sanitized}.jsonl`
 
 Session ID sanitization: `strings.ReplaceAll(sessionID, ":", "_")` — e.g. `main_telegram_123456789.jsonl`
 
@@ -564,7 +564,7 @@ func turnsToAPIMessages(turns []SessionTurn) []anthropic.MessageParam {
 
 ```toml
 [session]
-storage_dir               = "sessions"   # Relative to ~/.klawmbing/
+storage_dir               = "sessions"   # Relative to ~/.akb48/
 max_turns_in_context      = 50           # Max turns sent to LLM (Phase 1 limit)
 max_turns_before_compaction = 30         # Phase 2: triggers compaction check hook
 max_file_size_mb          = 10           # Log warning if session file exceeds this
@@ -572,7 +572,7 @@ max_context_tokens        = 40000        # Phase 2: token budget for GetContextT
 load_on_startup           = true         # Load all session files at startup
 ```
 
-All fields are required. Fail fast at startup if any are missing (pydantic-equivalent: use a validated struct with `toml:"..."` tags and check zero values explicitly, or use a validation library like `go-playground/validator`).
+All fields are required. Fail fast at startup if any are missing — use a validated struct with `toml:"..."` tags and `config.Validate() error` (see PRD-01). Optional: `go-playground/validator` for declarative field constraints.
 
 ---
 
@@ -593,7 +593,7 @@ All fields are required. Fail fast at startup if any are missing (pydantic-equiv
 ## 9. Acceptance Criteria
 
 - [ ] Multi-turn conversation works: agent recalls what was said earlier in the same session
-- [ ] After restarting Klawmbing, the agent recalls previous conversation from the loaded session
+- [ ] After restarting AKB48, the agent recalls previous conversation from the loaded session
 - [ ] CLI and Telegram sessions are independent (different session IDs, different histories)
 - [ ] Session JSONL file contains readable, complete turn records parseable with `jq`
 - [ ] Corrupt JSONL lines are skipped with a `slog.Warn` (no panic, no crash)
@@ -622,7 +622,7 @@ All fields are required. Fail fast at startup if any are missing (pydantic-equiv
 This is the complete flow when all five PRDs are implemented:
 
 ```
-1. Operator runs: go run ./klawmbing.go
+1. Operator runs: go run ./cmd/akb48/
    ├── config.toml loaded and validated (PRD-01)
    ├── LLM caller initialised with Anthropic SDK (PRD-01)
    ├── Tool registry created (PRD-01)
@@ -632,7 +632,7 @@ This is the complete flow when all five PRDs are implemented:
    ├── SessionManager.LoadAll() — active sessions loaded from disk (PRD-05)
    ├── CLI adapter started (PRD-02)
    ├── Telegram adapter started, long-polling (PRD-02)
-   └── slog.Info: "Klawmbing started. Adapters: CLI, Telegram. Brain: connected (32 tools). Skills: 2."
+   └── slog.Info: "AKB48 started. Adapters: CLI, Telegram. Brain: connected (32 tools). Skills: 2."
 
 2. Operator sends via Telegram: "Hello, who are you?"
    ├── Telegram adapter receives update (PRD-02)
@@ -645,7 +645,7 @@ This is the complete flow when all five PRDs are implemented:
    ├── session.AddTurn(turn)
    ├── RunHooks() -> PersistSessionHook writes main_telegram_123456789.jsonl (PRD-05)
    ├── RunHooks() -> LogMetricsHook writes tool-calls.jsonl (PRD-05)
-   └── Agent: "I'm Klawmbing, your personal AI agent. I have access to a knowledge
+   └── Agent: "I'm AKB48, your personal AI agent. I have access to a knowledge
         brain and can research, remember things, and help you think through problems.
         What are you working on?"
 
@@ -659,7 +659,7 @@ This is the complete flow when all five PRDs are implemented:
    ├── Response: "Stored. Staging cluster is in ap-southeast-1."
    └── Turn persisted with ToolCallRecord to JSONL (PRD-05)
 
-4. Operator restarts Klawmbing (kill + restart)
+4. Operator restarts AKB48 (kill + restart)
    ├── LoadAll() reads main_telegram_123456789.jsonl: 2 turns loaded (PRD-05)
    └── GBrain reconnected (PRD-03)
 

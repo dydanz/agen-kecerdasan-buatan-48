@@ -1,4 +1,4 @@
-// Package main is the Klawmbing entry point.
+// Package main is the akb48 entry point.
 package main
 
 import (
@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/dydanz/klawmbing/internal/config"
+	"github.com/dydanz/akb48/internal/config"
 )
 
 func main() {
@@ -27,9 +27,9 @@ func main() {
 		return
 	}
 
-	// Runtime wiring is Phase 1 work (see .klawmbing-dev-plan/phase-1-session-runtime.md).
+	// Runtime wiring is Phase 1 work (see .akb48-dev-plan/phase-1-session-runtime.md).
 	// This scaffold confirms config loads correctly; the daemon loop comes next.
-	slog.Info("klawmbing starting", "model", cfg.LLM.Model)
+	slog.Info("akb48 starting", "model", cfg.LLM.Model)
 	slog.Warn("runtime not yet wired — start with --validate to confirm config")
 	os.Exit(1)
 }

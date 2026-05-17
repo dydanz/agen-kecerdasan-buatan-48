@@ -1,7 +1,7 @@
 # PRD-04: Identity & Skill System
 
 **Status:** Draft v2.0 (Go)
-**Parent:** PRD-00 (Klawmbing Master PRD)
+**Parent:** PRD-00 (AKB48 Master PRD)
 **Author:** Dandi
 **Created:** April 26, 2026
 **Revised:** May 1, 2026
@@ -12,7 +12,7 @@
 
 ## 1. Problem
 
-Without a persistent identity, Klawmbing is a generic AI assistant. Without skills, every capability must be hardcoded in the runtime. This PRD establishes two core principles:
+Without a persistent identity, AKB48 is a generic AI assistant. Without skills, every capability must be hardcoded in the runtime. This PRD establishes two core principles:
 
 1. **Identity:** The agent knows who it is (SOUL.md), what rules to follow (AGENTS.md), and who the operator is (USER.md). These are loaded at startup and stay consistent across every conversation.
 
@@ -24,7 +24,7 @@ This is the "fat skills" half of "thin harness, fat skills."
 
 ## 2. Goals
 
-- **G1:** Klawmbing loads identity files (AGENTS.md, SOUL.md, USER.md) at startup and includes them in every system prompt
+- **G1:** AKB48 loads identity files (AGENTS.md, SOUL.md, USER.md) at startup and includes them in every system prompt
 - **G2:** Skills are markdown files following the Agent Skills standard (SKILL.md format)
 - **G3:** A skill resolver maps user intent to the correct skill file
 - **G4:** Only ONE skill is injected per turn (keeps token count low)
@@ -45,9 +45,9 @@ This is the "fat skills" half of "thin harness, fat skills."
 
 | ID | Story | Acceptance Criteria |
 |----|-------|-------------------|
-| US-S01 | As an operator, Klawmbing responds with the personality I defined in SOUL.md | Response tone, style, and behavior match SOUL.md instructions |
-| US-S02 | As an operator, Klawmbing follows the rules I defined in AGENTS.md | Agent refuses or behaves according to rules (e.g., "never push to main") |
-| US-S03 | As an operator, Klawmbing knows who I am from USER.md | Agent references operator context naturally (name, company, role) without being told each session |
+| US-S01 | As an operator, AKB48 responds with the personality I defined in SOUL.md | Response tone, style, and behavior match SOUL.md instructions |
+| US-S02 | As an operator, AKB48 follows the rules I defined in AGENTS.md | Agent refuses or behaves according to rules (e.g., "never push to main") |
+| US-S03 | As an operator, AKB48 knows who I am from USER.md | Agent references operator context naturally (name, company, role) without being told each session |
 | US-S04 | As an operator, I ask to "research Go vs Rust" and the research skill is invoked | Log shows "skill resolved: research". Response follows the research skill template. |
 | US-S05 | As an operator, I ask "What's the weather like?" (no matching skill) and get a general response | Agent responds in general mode. Log shows "no skill matched, using general mode". |
 | US-S06 | As a developer, I add a new skill file to `skills/` and it's immediately available | No restart required. Skill resolver re-reads SKILL.md from disk on each message. |
@@ -62,10 +62,10 @@ This is the "fat skills" half of "thin harness, fat skills."
 #### identity/AGENTS.md — Operational Rules
 
 ```markdown
-# Klawmbing Agent Rules
+# AKB48 Agent Rules
 
 ## Core Rules
-- You are Klawmbing, a personal AI agent for the operator.
+- You are AKB48, a personal AI agent for the operator.
 - You have access to a knowledge brain (GBrain) via tools. Use it proactively.
 - When the operator shares a fact, store it in the brain using gbrain_put.
 - When answering questions that might benefit from stored knowledge, search the brain first using gbrain_search.
@@ -88,7 +88,7 @@ This is the "fat skills" half of "thin harness, fat skills."
 #### identity/SOUL.md — Personality
 
 ```markdown
-# Klawmbing's Soul
+# AKB48's Soul
 
 You are a sharp, opinionated technical co-founder with deep backend engineering experience.
 You think in systems. You default to simplicity over cleverness.
@@ -128,7 +128,7 @@ Background: Backend engineering (Go, Python), engineering management
 
 ## Current Focus
 - Building a company as a solo operator
-- Establishing AI agent infrastructure (Klawmbing)
+- Establishing AI agent infrastructure (AKB48)
 - [TODO: Add current business priorities]
 ```
 
@@ -513,7 +513,7 @@ If the fact relates to an existing brain page, update that page instead of creat
 
 ```toml
 [skills]
-skills_dir   = "skills"    # Relative to the runtime root (~/.klawmbing/)
+skills_dir   = "skills"    # Relative to the runtime root (~/.akb48/)
 identity_dir = "identity"  # Relative to the runtime root
 ```
 
