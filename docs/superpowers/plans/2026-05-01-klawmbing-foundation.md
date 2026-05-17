@@ -1,8 +1,8 @@
-# Klawmbing Foundation Implementation Plan
+# AKB48 Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the core Go packages — types, config, tool registry, and LLM caller — that every other Klawmbing component depends on.
+**Goal:** Build the core Go packages — types, config, tool registry, and LLM caller — that every other AKB48 component depends on.
 
 **Architecture:** Thin, dependency-injected packages under `internal/`. No global state. The LLM caller wraps the Anthropic Go SDK, handles streaming via `chan string`, enforces a tool-loop round limit, and truncates oversized tool results. The tool registry is `sync.RWMutex`-protected and idempotency-keyed.
 
@@ -1185,7 +1185,7 @@ git commit -m "chore: foundation complete — config, types, tools, LLM caller a
 
 **Spec coverage:**
 - PRD-01: config struct ✓, LLM caller ✓, tool registry ✓, types ✓, idempotency ✓, max_tool_rounds ✓, result truncation ✓
-- Entry point (`cmd/klawmbing/main.go`) and runtime (`internal/runtime/`) — intentionally deferred to Plan 3 (needs adapters and session to be meaningful)
+- Entry point (`cmd/akb48/main.go`) and runtime (`internal/runtime/`) — intentionally deferred to Plan 3 (needs adapters and session to be meaningful)
 - Streaming (`chan string`) — implemented in `streamCall` ✓
 
 **Placeholder scan:** No TBDs or TODOs in task steps. The SDK type note in Task 5 Step 3 is advisory (not a placeholder — the logic is complete and the note tells the engineer exactly what to check if compilation fails).

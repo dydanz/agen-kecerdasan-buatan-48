@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/dydanz/klawmbing/internal/tools"
-	"github.com/dydanz/klawmbing/internal/types"
+	"github.com/dydanz/akb48/internal/tools"
+	"github.com/dydanz/akb48/internal/types"
 )
 
 func TestRegistry_ExecuteKnownTool(t *testing.T) {

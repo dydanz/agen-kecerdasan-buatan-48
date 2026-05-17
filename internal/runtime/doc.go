@@ -1,2 +1,2 @@
-// Package runtime wires all Klawmbing components into the KlawmbingRuntime.
+// Package runtime wires all Klawmbing components into the AKB48Runtime.
 package runtime

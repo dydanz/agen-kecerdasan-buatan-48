@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-The Klawmbing PRDs (01–05) correctly establish a layered memory model (brain, session, identity, skills) but leave four gaps that limit effectiveness and inflate cost:
+The AKB48 PRDs (01–05) correctly establish a layered memory model (brain, session, identity, skills) but leave four gaps that limit effectiveness and inflate cost:
 
 1. Session history is sent uncached every turn — the largest token block, with no cache strategy
 2. Cold sessions start dumb — the agent has to discover what it knows via tool-call round trips
@@ -102,7 +102,7 @@ Default threshold: 30 minutes. Configurable via `session.cold_resume_threshold_m
 [What I recall that may be relevant]
 - Dandi decided to use PostgreSQL + pgvector for brain storage (decision, 2025-03-15)
 - GBrain serve must be running before klawmbing starts (project:klawmbing)
-- Startup sequence: gbrain serve → ./klawmbing (project:klawmbing)
+- Startup sequence: gbrain serve → ./akb48 (project:klawmbing)
 ```
 
 4. On subsequent turns, `isCold` naturally evaluates to `false`: `TurnCount() > 0` and `UpdatedAt` is recent. No extra flag required. Tier 3 is omitted automatically.

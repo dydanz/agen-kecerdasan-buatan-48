@@ -1,4 +1,4 @@
-# Klawmbing — Document 3: Build Strategy, Implementation Plan & Risks
+# AKB48 — Document 3: Build Strategy, Implementation Plan & Risks
 
 ## For: Solo CTO/CEO building a personal AI agent system
 ## Architecture: GBrain-style (thin claw + knowledge graph + skill files)
@@ -19,7 +19,7 @@
   - CLI: stdin/stdout (for dev/testing)
 - **Brain:** GBrain installed, connected via MCP (`gbrain serve`)
 - **LLM:** Claude Sonnet 4.6 via Anthropic API (primary), Haiku 4.5 (extraction)
-- **Session:** JSONL files under `~/.klawmbing/sessions/`
+- **Session:** JSONL files under `~/.akb48/sessions/`
 - **Skills:** 3-5 skill files for most common workflows
 
 **Week-by-week plan:**
@@ -84,7 +84,7 @@ The resolver is simple: intent keywords → skill file path → load skill into 
 
 ### MUST ADOPT:
 
-**Session Resolution Model** — Every message maps to a session type with security boundaries. Even as solo operator, you'll eventually expose Klawmbing to a group chat. Without session-scoped permissions, one prompt injection can access everything. Implementation: session ID convention + permission lookup table.
+**Session Resolution Model** — Every message maps to a session type with security boundaries. Even as solo operator, you'll eventually expose AKB48 to a group chat. Without session-scoped permissions, one prompt injection can access everything. Implementation: session ID convention + permission lookup table.
 
 **System Prompt Composition** — AGENTS.md (rules) + SOUL.md (personality) + selective skill injection per turn. Never dump all skills into every prompt. Route intent → inject only the relevant skill.
 
@@ -112,10 +112,10 @@ class ChannelAdapter:
 
 ---
 
-## 3. Klawmbing Component Breakdown
+## 3. AKB48 Component Breakdown
 
 ```
-~/.klawmbing/
+~/.akb48/
 ├── klawmbing.py              # Entry point, starts gateway
 ├── config.json               # API keys, channel tokens, model config
 │
@@ -181,7 +181,7 @@ class ChannelAdapter:
 
 ### Ecosystem Fragmentation
 **Risk:** OpenClaw community crisis → fragmented into Hermes, ZeroClaw, NanoClaw, IronClaw, etc. Building on a fragmenting ecosystem.
-**Mitigation:** Klawmbing is YOUR claw. You control the runtime. GBrain is MIT-licensed. If GBrain development stalls, the brain repo + PostgreSQL + pgvector are all standard technology you can maintain yourself.
+**Mitigation:** AKB48 is YOUR claw. You control the runtime. GBrain is MIT-licensed. If GBrain development stalls, the brain repo + PostgreSQL + pgvector are all standard technology you can maintain yourself.
 
 ### Skill Drift
 **Risk:** After months of accumulating skills, 15% become unreachable (measured in real OpenClaw deployments). Skills overlap, conflict, or reference stale conventions.

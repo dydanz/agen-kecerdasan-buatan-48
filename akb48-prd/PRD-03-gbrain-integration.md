@@ -1,7 +1,7 @@
 # PRD-03: GBrain Integration via MCP
 
 **Status:** Draft v2.0 (Go)
-**Parent:** PRD-00 (Klawmbing Master PRD)
+**Parent:** PRD-00 (AKB48 Master PRD)
 **Author:** Dandi
 **Created:** April 26, 2026
 **Revised:** May 1, 2026
@@ -12,19 +12,19 @@
 
 ## 1. Problem
 
-Klawmbing needs a brain — a persistent knowledge store where the agent can query past context ("What do I know about our staging cluster?") and store new facts ("Remember that the database port changed to 5433"). Without a brain, every conversation starts from zero and no knowledge compounds.
+AKB48 needs a brain — a persistent knowledge store where the agent can query past context ("What do I know about our staging cluster?") and store new facts ("Remember that the database port changed to 5433"). Without a brain, every conversation starts from zero and no knowledge compounds.
 
-GBrain is our chosen brain. It exposes 30+ tools via MCP (Model Context Protocol). This PRD covers connecting Klawmbing to GBrain via MCP and registering GBrain's tools in Klawmbing's tool registry so the LLM can invoke them naturally.
+GBrain is our chosen brain. It exposes 30+ tools via MCP (Model Context Protocol). This PRD covers connecting AKB48 to GBrain via MCP and registering GBrain's tools in AKB48's tool registry so the LLM can invoke them naturally.
 
 ---
 
 ## 2. Goals
 
-- **G1:** Klawmbing starts a GBrain MCP server on startup and maintains the connection
-- **G2:** GBrain's MCP tools are registered in Klawmbing's tool registry and available to the LLM
+- **G1:** AKB48 starts a GBrain MCP server on startup and maintains the connection
+- **G2:** GBrain's MCP tools are registered in AKB48's tool registry and available to the LLM
 - **G3:** The operator can ask "What do you know about X?" and get a gbrain-backed answer
 - **G4:** The operator can say "Remember that Y" and have it stored in gbrain
-- **G5:** If GBrain is unavailable, Klawmbing continues operating (degraded mode) — it just can't access memory
+- **G5:** If GBrain is unavailable, AKB48 continues operating (degraded mode) — it just can't access memory
 
 ## 3. Non-Goals
 
@@ -41,7 +41,7 @@ GBrain is our chosen brain. It exposes 30+ tools via MCP (Model Context Protocol
 | Actor | Role |
 |-------|------|
 | Operator | Asks questions that require brain context, stores facts |
-| Klawmbing Runtime | Manages MCP connection, dispatches tool calls |
+| AKB48 Runtime | Manages MCP connection, dispatches tool calls |
 | GBrain MCP Server | Provides search, put, get, query, graph tools via MCP |
 | Claude API | Decides when to invoke gbrain tools based on the conversation |
 
@@ -51,10 +51,10 @@ GBrain is our chosen brain. It exposes 30+ tools via MCP (Model Context Protocol
 
 | ID | Story | Acceptance Criteria |
 |----|-------|-------------------|
-| US-B01 | As an operator, when Klawmbing starts, GBrain is automatically connected | Startup log shows "GBrain connected: N tools available" |
+| US-B01 | As an operator, when AKB48 starts, GBrain is automatically connected | Startup log shows "GBrain connected: N tools available" |
 | US-B02 | As an operator, I ask "What do you know about our staging cluster?" and the agent searches gbrain | Agent invokes `gbrain_search` tool, returns relevant results from brain |
 | US-B03 | As an operator, I say "Remember that our staging cluster is in ap-southeast-1" and it's stored | Agent invokes `gbrain_put` tool, confirms storage, fact is retrievable in future sessions |
-| US-B04 | As an operator, if GBrain crashes, Klawmbing tells me and continues working without memory | Chat shows "Brain disconnected — operating without memory" and responses continue (without brain context) |
+| US-B04 | As an operator, if GBrain crashes, AKB48 tells me and continues working without memory | Chat shows "Brain disconnected — operating without memory" and responses continue (without brain context) |
 | US-B05 | As an operator, I can query the brain's page count or health | Agent can invoke `gbrain_stats` or similar diagnostic tool |
 
 ---
@@ -65,7 +65,7 @@ GBrain is our chosen brain. It exposes 30+ tools via MCP (Model Context Protocol
 
 ```
 ┌────────────────────┐       stdio        ┌──────────────────┐
-│   Klawmbing        │◄────────────────►  │   GBrain MCP     │
+│   AKB48        │◄────────────────►  │   GBrain MCP     │
 │   (MCP Client)     │   JSON-RPC 2.0     │   Server         │
 │                    │                     │   (gbrain serve) │
 │  ┌──────────────┐  │                     │  ┌────────────┐  │
@@ -82,7 +82,7 @@ GBrain is our chosen brain. It exposes 30+ tools via MCP (Model Context Protocol
 **Why stdio over HTTP SSE:**
 - Simpler: no HTTP server, no port allocation, no CORS
 - Co-located: both processes run on the same VPS
-- Lifecycle: Klawmbing manages GBrain as a child process — starts it, monitors it, restarts if crashed
+- Lifecycle: AKB48 manages GBrain as a child process — starts it, monitors it, restarts if crashed
 - Latency: subprocess stdio is faster than localhost HTTP
 
 ### 6.2 Core Types
@@ -325,7 +325,7 @@ The `makeHandler` closure returns `ErrBrainUnavailable` (not a panic) when `IsAv
 
 ### 6.6 Expected GBrain MCP Tools
 
-Tools are discovered dynamically via `tools/list` — Klawmbing hardcodes nothing. The table below is informational only, based on GBrain v0.12 documentation:
+Tools are discovered dynamically via `tools/list` — AKB48 hardcodes nothing. The table below is informational only, based on GBrain v0.12 documentation:
 
 | Tool | Purpose | Hello World? |
 |------|---------|-------------|
@@ -349,7 +349,7 @@ Tools are discovered dynamically via `tools/list` — Klawmbing hardcodes nothin
 If GBrain is unavailable:
 1. `makeHandler` closures return `("", ErrBrainUnavailable)` — the tool registry converts this to an error string: `"Error: Brain is disconnected. Operating without memory."`
 2. The LLM receives this error string and explains to the user that memory is unavailable
-3. Klawmbing continues processing messages — just without brain-backed context
+3. AKB48 continues processing messages — just without brain-backed context
 4. `slog.Warn` is emitted every 60 seconds: "GBrain disconnected — operating in degraded mode"
 5. The health-monitor goroutine continues attempting reconnect every `HealthCheckInterval` seconds
 
@@ -389,7 +389,7 @@ Config is parsed by the PRD-01 config loader into `BrainConfig` via `github.com/
 
 ## 9. Setup Prerequisites
 
-Before Klawmbing can connect to GBrain, the operator must:
+Before AKB48 can connect to GBrain, the operator must:
 
 1. **Install GBrain:**
    ```bash
@@ -434,14 +434,14 @@ Before Klawmbing can connect to GBrain, the operator must:
 
 ## 11. Acceptance Criteria
 
-- [ ] `gbrain serve` is started automatically when Klawmbing starts (if `brain.enabled = true`)
+- [ ] `gbrain serve` is started automatically when AKB48 starts (if `brain.enabled = true`)
 - [ ] Startup log shows "GBrain connected: N tools available" with actual tool count
 - [ ] Operator asks "What do you know about X?" → agent invokes `gbrain_search` → returns results
 - [ ] Operator says "Remember that Y" → agent invokes `gbrain_put` → confirms stored
-- [ ] Stored fact is retrievable in a new session (restart Klawmbing, ask again)
+- [ ] Stored fact is retrievable in a new session (restart AKB48, ask again)
 - [ ] Killing the gbrain process triggers auto-restart within 30s
 - [ ] After 3 failed restarts, degraded mode is entered with clear user notification
-- [ ] With brain disabled in config, Klawmbing starts and operates without brain tools
+- [ ] With brain disabled in config, AKB48 starts and operates without brain tools
 - [ ] Concurrent tool calls from a single agent turn are handled correctly (no response misrouting)
 - [ ] Cancelling a context mid-request does not leak the response channel
 
@@ -452,8 +452,8 @@ Before Klawmbing can connect to GBrain, the operator must:
 | ID | Question | Default |
 |----|----------|---------|
 | TODO-B01 | Exact GBrain installation steps may vary by version. Need to test with latest stable. | Test and document during implementation. |
-| TODO-B02 | Should Klawmbing manage GBrain's PostgreSQL via Docker Compose, or expect the operator to manage it separately? | Separate management. GBrain's own docs cover Postgres setup. Klawmbing shouldn't own GBrain's infra. |
+| TODO-B02 | Should AKB48 manage GBrain's PostgreSQL via Docker Compose, or expect the operator to manage it separately? | Separate management. GBrain's own docs cover Postgres setup. AKB48 shouldn't own GBrain's infra. |
 | TODO-B03 | Tool name collision: if GBrain exposes a tool called "search" and we later add a web search tool also called "search," they'll collide. The prefix (`gbrain_search`) prevents this, but is the prefix the right approach? | Yes, prefix all GBrain tools with `gbrain_`. Consistent, unambiguous, no collision risk. |
-| TODO-B04 | Should Klawmbing always include brain context in the system prompt (pre-fetch relevant pages), or let the LLM decide when to search? | Let the LLM decide (tool call). Pre-fetching adds latency and tokens to every message. The LLM is good at deciding when it needs context. Revisit if retrieval quality is poor. |
-| TODO-B05 | GBrain brain directory: `~/brain/` or `~/.klawmbing/brain/`? Separate lifecycle vs co-located management. | `~/brain/` — the brain has its own lifecycle, independent of the claw runtime. Multiple claws could theoretically share a brain. |
+| TODO-B04 | Should AKB48 always include brain context in the system prompt (pre-fetch relevant pages), or let the LLM decide when to search? | Let the LLM decide (tool call). Pre-fetching adds latency and tokens to every message. The LLM is good at deciding when it needs context. Revisit if retrieval quality is poor. |
+| TODO-B05 | GBrain brain directory: `~/brain/` or `~/.akb48/brain/`? Separate lifecycle vs co-located management. | `~/brain/` — the brain has its own lifecycle, independent of the claw runtime. Multiple claws could theoretically share a brain. |
 | TODO-B06 | Should `readLoop` log and skip unrecognized JSON lines (e.g. GBrain startup banners on stderr that bleed into stdout), or treat them as fatal? | Log and skip. GBrain may emit diagnostic lines; the reader should be tolerant. Validate that the `id` field exists before routing. |

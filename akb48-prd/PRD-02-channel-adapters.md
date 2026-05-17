@@ -1,7 +1,7 @@
 # PRD-02: Channel Adapters (CLI + Telegram)
 
 **Status:** Draft v2.0
-**Parent:** PRD-00 (Klawmbing Master PRD)
+**Parent:** PRD-00 (AKB48 Master PRD)
 **Author:** Dandi
 **Created:** April 26, 2026
 **Dependencies:** PRD-01 (Core Runtime)
@@ -11,7 +11,7 @@
 
 ## 1. Problem
 
-Klawmbing needs to receive messages from the operator and send responses back. The operator's primary interface is Telegram (mobile-first, available everywhere). For development and testing, a CLI adapter is essential — it removes the Telegram dependency during local iteration.
+AKB48 needs to receive messages from the operator and send responses back. The operator's primary interface is Telegram (mobile-first, available everywhere). For development and testing, a CLI adapter is essential — it removes the Telegram dependency during local iteration.
 
 Both adapters must implement the same `ChannelAdapter` interface so the runtime treats them identically.
 
@@ -40,7 +40,7 @@ Both adapters must implement the same `ChannelAdapter` interface so the runtime 
 
 | ID | Story | Acceptance Criteria |
 |----|-------|-------------------|
-| US-A01 | As a developer, I start Klawmbing with CLI adapter and type a message, and get a response printed to terminal | Response appears character-by-character as tokens stream in. No Telegram dependency needed. |
+| US-A01 | As a developer, I start AKB48 with CLI adapter and type a message, and get a response printed to terminal | Response appears character-by-character as tokens stream in. No Telegram dependency needed. |
 | US-A02 | As an operator, I send a Telegram message to my bot and get a response in the same chat | Response appears as a single message that progressively updates as tokens stream in. |
 | US-A03 | As an operator, if someone else messages my bot, they are ignored | Non-allowlisted users receive no response. Event is logged as `unauthorized: user_id=X`. |
 | US-A04 | As an operator, I see a "typing..." indicator while the agent is processing | Telegram `sendChatAction(typing)` is sent before the LLM call starts. |
@@ -137,7 +137,7 @@ func New(in io.Reader, out io.Writer, handle adapters.HandleMessage) *CLIAdapter
 
 // Start blocks, reading lines from stdin until ctx is cancelled or EOF.
 func (a *CLIAdapter) Start(ctx context.Context) error {
-    fmt.Fprintln(a.out, "Klawmbing CLI — Type a message (Ctrl+C or Ctrl+D to exit)")
+    fmt.Fprintln(a.out, "AKB48 CLI — Type a message (Ctrl+C or Ctrl+D to exit)")
     fmt.Fprintln(a.out, "──────────────────────────────────────────────────")
     for {
         fmt.Fprint(a.out, "\n> ")

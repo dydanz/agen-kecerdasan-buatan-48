@@ -1,4 +1,4 @@
-# PRD-00: Klawmbing — Master Product Requirements Document
+# PRD-00: AKB48 — Master Product Requirements Document
 
 **Status:** Draft v1.0
 **Author:** Dandi (CTO/CEO, Solo Operator)
@@ -53,7 +53,7 @@ Solo founders, solo CTOs, indie hackers, and technical executives who:
 
 ### 2.1 Product Vision
 
-Klawmbing is a **thin, self-hosted agent runtime** that connects a mobile chat interface (Telegram/Discord) to a compounding knowledge brain (GBrain). The operator chats naturally; Klawmbing routes intent to skill files, executes with tools, stores knowledge, and gets smarter overnight — without code deploys, without managed services, without vendor lock-in.
+AKB48 is a **thin, self-hosted agent runtime** that connects a mobile chat interface (Telegram/Discord) to a compounding knowledge brain (GBrain). The operator chats naturally; AKB48 routes intent to skill files, executes with tools, stores knowledge, and gets smarter overnight — without code deploys, without managed services, without vendor lock-in.
 
 ### 2.2 One-Line Description
 
@@ -95,7 +95,7 @@ The system is successful when:
 - Over-engineered frameworks that require a team to operate
 - Vendor lock-in on data and capabilities
 
-### 3.2 Secondary Actor: The Agent (Klawmbing itself)
+### 3.2 Secondary Actor: The Agent (AKB48 itself)
 
 **Characteristics:**
 - Receives messages from chat platforms
@@ -123,20 +123,20 @@ The system is successful when:
 |----|---------|-------------|------------|----------|
 | US-001 | Operator | Send a message via Telegram and receive an AI response | I can verify the end-to-end chat → LLM → chat loop works | P0 |
 | US-002 | Operator | Send a message via CLI and receive an AI response | I can develop and test without needing Telegram | P0 |
-| US-003 | Operator | Have Klawmbing load its identity from AGENTS.md and SOUL.md | Responses reflect my configured personality and rules | P0 |
-| US-004 | Operator | Have Klawmbing connect to GBrain via MCP | The agent can query and store knowledge | P0 |
+| US-003 | Operator | Have AKB48 load its identity from AGENTS.md and SOUL.md | Responses reflect my configured personality and rules | P0 |
+| US-004 | Operator | Have AKB48 connect to GBrain via MCP | The agent can query and store knowledge | P0 |
 | US-005 | Operator | Ask "What do you know about X?" and get a gbrain-backed answer | Memory retrieval works end-to-end | P0 |
 | US-006 | Operator | Tell the agent "Remember that our database uses port 5433" and have it persist | Memory storage works end-to-end | P0 |
 | US-007 | Operator | Have session history persist across restarts | I don't lose context when the process crashes | P1 |
 | US-008 | Operator | See which skill file was invoked for a given message | I can debug routing issues | P1 |
-| US-009 | Operator | Have Klawmbing stream responses token-by-token in Telegram | The UX feels responsive, not blocked | P1 |
+| US-009 | Operator | Have AKB48 stream responses token-by-token in Telegram | The UX feels responsive, not blocked | P1 |
 
 ### 4.2 Post-Hello World (covered by sub-PRDs, not implemented in Milestone 0)
 
 | ID | Story | Phase |
 |----|-------|-------|
 | US-010 | Run a daily briefing at 7am via cron | Phase 1, Week 4 |
-| US-011 | Ask Klawmbing to research a topic and store findings in gbrain | Phase 1, Week 3 |
+| US-011 | Ask AKB48 to research a topic and store findings in gbrain | Phase 1, Week 3 |
 | US-012 | Have sessions compact after N turns with memory flush | Phase 2 |
 | US-013 | Open a GitHub PR via chat command | Phase 2 |
 | US-014 | Run tests on a PR via chat command | Phase 2 |
@@ -148,7 +148,7 @@ The system is successful when:
 
 ### 5.1 Architecture Overview
 
-Klawmbing follows the **"thin harness, fat skills"** pattern:
+AKB48 follows the **"thin harness, fat skills"** pattern:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -258,15 +258,15 @@ This master PRD decomposes into five sub-PRDs, each building toward "hello world
 
 All five sub-PRDs are complete when:
 
-1. Operator starts Klawmbing with `python klawmbing.py`
+1. Operator starts AKB48 with `python klawmbing.py`
 2. GBrain MCP server is running (`gbrain serve`)
 3. Operator sends "Hello, who are you?" via Telegram
-4. Klawmbing responds with a personality-consistent answer (from SOUL.md)
+4. AKB48 responds with a personality-consistent answer (from SOUL.md)
 5. Operator sends "Remember that our staging cluster is ap-southeast-1"
-6. Klawmbing stores this in gbrain and confirms
+6. AKB48 stores this in gbrain and confirms
 7. Operator sends "What do you know about our staging cluster?"
-8. Klawmbing retrieves from gbrain and responds with the stored fact
-9. Operator restarts Klawmbing
+8. AKB48 retrieves from gbrain and responds with the stored fact
+9. Operator restarts AKB48
 10. Previous session context is available (session persistence works)
 
 ---
@@ -317,7 +317,7 @@ All five sub-PRDs are complete when:
 
 | Metric | Target |
 |--------|--------|
-| Daily active usage | Operator uses Klawmbing 5+ times/day |
+| Daily active usage | Operator uses AKB48 5+ times/day |
 | Skill count | 5-8 active skills |
 | GBrain pages | 100+ pages after 2 weeks |
 | Token cost | < $200/month |
@@ -338,7 +338,7 @@ All five sub-PRDs are complete when:
 | TODO-007 | Config format: JSON, TOML, or YAML? Need to store API keys, channel tokens, model configs, skill paths. | Developer experience | Default: TOML (human-readable, typed, Python stdlib support via tomllib) |
 | TODO-008 | Discord adapter: discord.py or nextcord? discord.py is maintained again but had a hiatus. nextcord is the community fork. | Dependency | **Decide before Discord adapter implementation.** Default: discord.py (original, maintained) |
 | TODO-009 | How to handle Telegram rate limits (30 msg/sec global, 1 msg/sec per chat for edits)? Need throttling for streaming responses. | Reliability | **Resolve during PRD-02 implementation.** Default: 1 edit per second for streaming |
-| TODO-010 | GBrain brain directory location: inside `~/.klawmbing/` or separate `~/brain/`? Affects backup strategy. | Operations | Default: `~/brain/` (independent lifecycle from claw runtime) |
+| TODO-010 | GBrain brain directory location: inside `~/.akb48/` or separate `~/brain/`? Affects backup strategy. | Operations | Default: `~/brain/` (independent lifecycle from claw runtime) |
 | TODO-011 | Operator identity: should USER.md be a gbrain page or a local file? If gbrain page, it's queryable by agents. If local, it's simpler but not searchable. | Architecture | Default: local file (simpler, loaded at startup, not agent-modifiable) |
 | TODO-012 | Error presentation in chat: verbose (full stack trace) or concise (one-line + log reference)? | UX | Default: concise in chat + full details in log file |
 
@@ -348,7 +348,7 @@ All five sub-PRDs are complete when:
 
 | Term | Definition |
 |------|-----------|
-| **Claw** | A thin agent runtime that receives messages, routes to skills, calls LLMs, executes tools. Klawmbing is our claw. |
+| **Claw** | A thin agent runtime that receives messages, routes to skills, calls LLMs, executes tools. AKB48 is our claw. |
 | **Brain** | A knowledge storage and retrieval system. GBrain is our brain. |
 | **Skill file** | A markdown file (SKILL.md) that encodes agent behavior for a specific capability. Injected into the system prompt when relevant. |
 | **Skill resolver** | The component that maps user intent to the correct skill file. |

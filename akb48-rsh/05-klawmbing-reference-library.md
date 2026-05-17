@@ -1,11 +1,11 @@
-# Klawmbing — Document 5: Reference Library
+# AKB48 — Document 5: Reference Library
 
 ## Curated sources organized by architectural concern
 ## Date: April 2026
 
 ---
 
-## 1. Thin Agent Runtimes (Klawmbing's category)
+## 1. Thin Agent Runtimes (AKB48's category)
 
 | Source | URL | Why it matters |
 |--------|-----|----------------|
@@ -17,7 +17,7 @@
 | Turing Post — Hermes vs OpenClaw | https://www.turingpost.com/p/hermes | Architectural comparison of the two approaches |
 | ZeroClaw (Rust reimplementation) | https://github.com/zeroclaw-labs/zeroclaw | Edge deployment, single binary, SQLite hybrid memory |
 | Zeroclawed (security fork) | https://github.com/bglusman/zeroclawed | Router/agent separation, Starlark policy daemon |
-| Claw Code Agent (Python) | https://github.com/HarnessLab/claw-code-agent | Pure Python claw with zero dependencies — study for Klawmbing |
+| Claw Code Agent (Python) | https://github.com/HarnessLab/claw-code-agent | Pure Python claw with zero dependencies — study for AKB48 |
 | awesome-openclaw-agents | https://github.com/mergisi/awesome-openclaw-agents | 162 production SOUL.md/skill templates |
 | awesome-hermes-agent | https://github.com/0xNyk/awesome-hermes-agent | Curated skills, plugins, GUIs for Hermes |
 

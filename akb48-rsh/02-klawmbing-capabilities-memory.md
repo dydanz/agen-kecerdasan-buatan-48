@@ -1,4 +1,4 @@
-# Klawmbing — Document 2: Agent Capabilities, Memory & Learning Strategy
+# AKB48 — Document 2: Agent Capabilities, Memory & Learning Strategy
 
 ## For: Solo CTO/CEO building a personal AI agent system
 ## Architecture: GBrain-style (thin claw + knowledge graph + skill files)
@@ -186,7 +186,7 @@ Every LLM fallback is logged. Periodic review generates better regex patterns fr
 
 ## 4. Memory Approach Comparison
 
-| Approach | When to Use | Limitations | Klawmbing Role |
+| Approach | When to Use | Limitations | AKB48 Role |
 |----------|-------------|-------------|----------------|
 | **RAG (vector search)** | Starting point. Semantic similarity. | Read-only. No learning. Retrieves by similarity, not relevance-over-time. | GBrain's search pipeline uses this as ONE signal (combined with keyword + graph) |
 | **Knowledge graph** | Tracking relationships between entities. "Who works at X?" "What did Y invest in?" | Requires extraction pipeline. | GBrain auto-wires this with zero LLM calls |
@@ -199,7 +199,7 @@ Every LLM fallback is logged. Periodic review generates better regex patterns fr
 
 ## 5. Context Compaction Strategy
 
-Sessions grow. Context windows don't. Klawmbing needs compaction:
+Sessions grow. Context windows don't. AKB48 needs compaction:
 
 **Before compacting — Memory Flush:**
 1. Run cheap model (Haiku) to extract structured facts from oldest turns
@@ -225,7 +225,7 @@ Sessions grow. Context windows don't. Klawmbing needs compaction:
 - `group:<channel>:<id>` — group chat, sandboxed, mention-gated
 
 ### Session persistence:
-- JSONL files under `~/.klawmbing/sessions/`
+- JSONL files under `~/.akb48/sessions/`
 - Each session = append-only event log
 - Crash recovery: reload last session file, resume from last turn
 

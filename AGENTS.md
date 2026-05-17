@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ---
 
@@ -55,11 +55,11 @@ Session Resolver → loads JSONL session from ~/.akb48/sessions/
 Context Assembler
     ├── AGENTS.md + SOUL.md + USER.md (always, cached via prompt caching)
     ├── Skill resolver → injects ONE SKILL.md (if intent matches)
-    ├── Session history (last N turns as Claude API messages)
+    ├── Session history (last N turns as Codex API messages)
     └── Brain context (LLM decides to search via tools, not pre-fetched)
         │
         ▼
-LLM Caller (Claude Sonnet 4.6, streaming, goroutines + channels)
+LLM Caller (Codex Sonnet 4.6, streaming, goroutines + channels)
         │
         ▼
 Tool Executor (idempotency-checked UUID per call)
@@ -74,8 +74,8 @@ Post-Turn Hooks (fire-and-forget via errgroup, never break main loop)
 ```
 
 **Model routing:**
-- `claude-sonnet-4-6` — generation, reasoning, code
-- `claude-haiku-4-5` — fact extraction, summarization (12× cheaper; use for all extraction)
+- `Codex-sonnet-4-6` — generation, reasoning, code
+- `Codex-haiku-4-5` — fact extraction, summarization (12× cheaper; use for all extraction)
 
 **Streaming:** LLM tokens are sent over a `chan string`; the adapter goroutine consumes the channel and forwards to the user.
 
@@ -151,7 +151,7 @@ Skill files have YAML frontmatter with `triggers` (keyword phrases). The resolve
 Every side-effecting tool call gets a UUID (`idempotency_key`) checked before execution. This prevents double-deploys and double-PRs on message retries or crashes.
 
 ### Prompt Caching
-The identity layer (AGENTS.md + SOUL.md + USER.md) is identical every turn — mark it with `cache_control` for Claude's prompt caching via `anthropic-sdk-go`. The skill injection sits after the cache boundary since it changes per turn.
+The identity layer (AGENTS.md + SOUL.md + USER.md) is identical every turn — mark it with `cache_control` for Codex's prompt caching via `anthropic-sdk-go`. The skill injection sits after the cache boundary since it changes per turn.
 
 ### Tool Registry
 Handlers are registered in a `sync.RWMutex`-protected map. Handler signature:
@@ -184,8 +184,8 @@ JSONL files, one per session. **Append-only** — each turn is one line. Never r
 
 ```toml
 [llm]
-model = "claude-sonnet-4-6-20260326"
-extraction_model = "claude-haiku-4-5-20251001"
+model = "Codex-sonnet-4-6-20260326"
+extraction_model = "Codex-haiku-4-5-20251001"
 api_key_env = "ANTHROPIC_API_KEY"   # Read from env, never stored
 max_tool_rounds = 5
 max_tool_result_tokens = 500

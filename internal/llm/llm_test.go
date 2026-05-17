@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dydanz/klawmbing/internal/config"
-	"github.com/dydanz/klawmbing/internal/llm"
-	"github.com/dydanz/klawmbing/internal/tools"
-	"github.com/dydanz/klawmbing/internal/types"
+	"github.com/dydanz/akb48/internal/config"
+	"github.com/dydanz/akb48/internal/llm"
+	"github.com/dydanz/akb48/internal/tools"
+	"github.com/dydanz/akb48/internal/types"
 )
 
 func TestIdempotencyKey_Deterministic(t *testing.T) {
