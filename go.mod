@@ -7,6 +7,7 @@ require github.com/BurntSushi/toml v1.4.0
 require (
 	github.com/anthropics/anthropic-sdk-go v1.38.0
 	github.com/google/uuid v1.6.0
+	golang.org/x/sync v0.16.0
 )
 
 require (
@@ -19,6 +20,5 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
-	golang.org/x/sync v0.16.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
