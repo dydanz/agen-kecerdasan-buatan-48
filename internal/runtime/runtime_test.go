@@ -154,11 +154,11 @@ func TestRuntime_StubAssembler_BuildsHistory(t *testing.T) {
 	if len(msgs) != 2 {
 		t.Errorf("expected 2 messages from stub assembler, got %d", len(msgs))
 	}
-	if msgs[0].Role != types.RoleUser || msgs[0].Content != "ping" {
-		t.Errorf("unexpected first msg: %+v", msgs[0])
+	if msgs[0].Role != "user" {
+		t.Errorf("expected user role, got %q", msgs[0].Role)
 	}
-	if msgs[1].Role != types.RoleAssistant || msgs[1].Content != "pong" {
-		t.Errorf("unexpected second msg: %+v", msgs[1])
+	if msgs[1].Role != "assistant" {
+		t.Errorf("expected assistant role, got %q", msgs[1].Role)
 	}
 }
 

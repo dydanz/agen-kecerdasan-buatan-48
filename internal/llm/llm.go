@@ -20,7 +20,7 @@ import (
 // CallParams holds input for a single Call invocation.
 type CallParams struct {
 	System   string
-	Messages []types.LLMMessage
+	Messages []anthropic.MessageParam
 	// Tokens is an optional channel to which streamed text tokens are sent.
 	// If nil, streaming is disabled and the response is returned in one shot.
 	Tokens chan<- string
@@ -90,17 +90,8 @@ func (c *Caller) Call(ctx context.Context, params CallParams) (*CallResult, erro
 		systemBlocks = []anthropic.TextBlockParam{{Text: params.System}}
 	}
 
-	// Convert conversation history to SDK MessageParams.
-	messages := make([]anthropic.MessageParam, 0, len(params.Messages))
-	for _, m := range params.Messages {
-		block := anthropic.NewTextBlock(m.Content)
-		switch m.Role {
-		case types.RoleAssistant:
-			messages = append(messages, anthropic.NewAssistantMessage(block))
-		default:
-			messages = append(messages, anthropic.NewUserMessage(block))
-		}
-	}
+	// Messages are already anthropic.MessageParam — use directly.
+	messages := params.Messages
 
 	// Build tool list from registry.
 	toolDefs := c.registry.Definitions()
