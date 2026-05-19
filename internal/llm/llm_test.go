@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	anthropic "github.com/anthropics/anthropic-sdk-go"
 	"github.com/dydanz/akb48/internal/config"
 	"github.com/dydanz/akb48/internal/llm"
 	"github.com/dydanz/akb48/internal/tools"
-	"github.com/dydanz/akb48/internal/types"
 )
 
 func TestIdempotencyKey_Deterministic(t *testing.T) {
@@ -71,7 +71,7 @@ func TestCall_ReturnsText(t *testing.T) {
 
 	result, err := caller.Call(context.Background(), llm.CallParams{
 		System:   "Reply with exactly the word: pong",
-		Messages: []types.LLMMessage{{Role: types.RoleUser, Content: "ping"}},
+		Messages: []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("ping"))},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -104,7 +104,7 @@ func TestCall_ToolLoop(t *testing.T) {
 	caller := llm.NewCaller(cfg, reg)
 	result, err := caller.Call(context.Background(), llm.CallParams{
 		System:   "Use the get_time tool to answer questions about the current time.",
-		Messages: []types.LLMMessage{{Role: types.RoleUser, Content: "What time is it right now?"}},
+		Messages: []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("What time is it right now?"))},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
