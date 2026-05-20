@@ -114,6 +114,21 @@ func (c *Config) applyDefaults() {
 	if c.Brain.ToolPrefix == "" {
 		c.Brain.ToolPrefix = "gbrain"
 	}
+	if c.Brain.GBrainCommand == "" {
+		c.Brain.GBrainCommand = "gbrain"
+	}
+	if len(c.Brain.GBrainArgs) == 0 {
+		c.Brain.GBrainArgs = []string{"serve"}
+	}
+	if c.Identity.Dir == "" {
+		c.Identity.Dir = "identity"
+	}
+	if c.Skills.Dir == "" {
+		c.Skills.Dir = "skills"
+	}
+	if c.Session.StorageDir == "" {
+		c.Session.StorageDir = "sessions"
+	}
 }
 
 func (c *Config) validate() error {

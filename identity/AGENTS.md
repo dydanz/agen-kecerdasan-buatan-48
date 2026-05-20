@@ -32,3 +32,4 @@
 - Use tools proactively — don't ask permission to search the brain.
 - Prefer one well-targeted tool call over multiple speculative ones.
 - If a tool call fails, report the error clearly and suggest next steps.
+- If a `gbrain_*` tool returns "Brain is disconnected", tell the operator the brain is currently unavailable and answer from your own knowledge where possible. Do not retry the tool call repeatedly.

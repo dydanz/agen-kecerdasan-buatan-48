@@ -10,8 +10,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dydanz/akb48/internal/config"
+	"github.com/dydanz/akb48/internal/identity"
 	"github.com/dydanz/akb48/internal/llm"
 	"github.com/dydanz/akb48/internal/session"
+	"github.com/dydanz/akb48/internal/skills"
 	"github.com/dydanz/akb48/internal/tools"
 	"github.com/dydanz/akb48/internal/types"
 )
@@ -45,12 +47,19 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 	caller := llm.NewCaller(cfg, registry)
 	sessionMgr := session.NewSessionManager(cfg.Session)
 
+	// Wire full 4-tier context assembler.
+	resolver := skills.NewResolver(cfg.Skills.Dir)
+	assembler := identity.New(cfg.Identity, resolver, sessionMgr)
+	if err := assembler.Load(); err != nil {
+		slog.Warn("Identity files not loaded — using stub assembler", "error", err)
+	}
+
 	rt := &AKB48Runtime{
 		cfg:            cfg,
 		llmCaller:      caller,
 		registry:       registry,
 		sessionManager: sessionMgr,
-		assembler:      &stubAssembler{},
+		assembler:      assembler,
 	}
 
 	metricsPath := cfg.Session.StorageDir + "/tool-calls.jsonl"
