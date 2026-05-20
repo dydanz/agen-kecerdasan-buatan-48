@@ -37,3 +37,8 @@ go.work.sum
 
 # Claude Code local memory (machine-specific)
 .claude/memory/
+
+# Cavement
+.caveman/
+.agents/*
+.claude/skills/cave*
