@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
 	"github.com/google/uuid"
 
+	"github.com/dydanz/akb48/internal/brain"
 	"github.com/dydanz/akb48/internal/config"
 	"github.com/dydanz/akb48/internal/identity"
 	"github.com/dydanz/akb48/internal/llm"
@@ -38,6 +40,8 @@ type AKB48Runtime struct {
 	registry       *tools.Registry
 	sessionManager *session.SessionManager
 	assembler      ContextAssembler
+	coldOpener     *session.ColdOpener
+	bridge         *brain.GBrainBridge
 	hooks          []session.HookFunc
 }
 
@@ -47,11 +51,32 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 	caller := llm.NewCaller(cfg, registry)
 	sessionMgr := session.NewSessionManager(cfg.Session)
 
+	// Wire GBrain bridge if enabled.
+	var brainBridge *brain.GBrainBridge
+	brainStatus := "disabled"
+
+	if cfg.Brain.Enabled {
+		brainBridge = brain.NewGBrainBridge(cfg.Brain, registry)
+		if err := brainBridge.Start(context.Background()); err != nil {
+			slog.Warn("GBrain failed to start — running in degraded mode", "error", err)
+			brainStatus = "degraded (unavailable)"
+			brainBridge = nil
+		} else {
+			brainStatus = fmt.Sprintf("connected (%d tools)", len(registry.Definitions()))
+		}
+	}
+
+	// Wire cold opener (requires brain).
+	var coldOpener *session.ColdOpener
+	if brainBridge != nil {
+		coldOpener = session.NewColdOpener(brainBridge, cfg.Session.ColdResumeThresholdMinutes)
+	}
+
 	// Wire full 4-tier context assembler.
 	resolver := skills.NewResolver(cfg.Skills.Dir)
 	assembler := identity.New(cfg.Identity, resolver, sessionMgr)
 	if err := assembler.Load(); err != nil {
-		slog.Warn("Identity files not loaded — using stub assembler", "error", err)
+		slog.Warn("Identity files not loaded — agent will use empty system prompt", "error", err)
 	}
 
 	rt := &AKB48Runtime{
@@ -60,6 +85,8 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 		registry:       registry,
 		sessionManager: sessionMgr,
 		assembler:      assembler,
+		coldOpener:     coldOpener,
+		bridge:         brainBridge,
 	}
 
 	metricsPath := cfg.Session.StorageDir + "/tool-calls.jsonl"
@@ -67,6 +94,12 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 		session.PersistSessionHook(sessionMgr),
 		session.LogMetricsHook(metricsPath),
 	}
+
+	slog.Info("AKB48 initialised",
+		"brain", brainStatus,
+		"skills", countSkillDirs(cfg.Skills.Dir),
+		"identity_dir", cfg.Identity.Dir,
+	)
 
 	return rt, nil
 }
@@ -80,12 +113,17 @@ func (r *AKB48Runtime) HandleMessage(ctx context.Context, msg types.Message, tok
 		return fmt.Errorf("resolve session: %w", err)
 	}
 
-	systemPrompt, messages, err := r.assembler.Build(sess, r.sessionManager, msg.Text, "")
+	// Cold opener: brain recall context injected for cold sessions.
+	coldContext := ""
+	if r.coldOpener != nil {
+		coldContext = r.coldOpener.BuildColdContext(ctx, sess, msg.Text)
+	}
+
+	systemPrompt, messages, err := r.assembler.Build(sess, r.sessionManager, msg.Text, coldContext)
 	if err != nil {
 		return fmt.Errorf("build context: %w", err)
 	}
 
-	// Append current user message (always uncached — Tier 4)
 	messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Text)))
 
 	turnID := uuid.NewString()
@@ -126,17 +164,20 @@ func (r *AKB48Runtime) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop flushes file handles.
+// Stop shuts down all components gracefully.
 func (r *AKB48Runtime) Stop() error {
+	if r.bridge != nil {
+		r.bridge.Stop()
+	}
 	return r.sessionManager.Shutdown()
 }
 
-// SetAssembler replaces the context assembler (Phase 2 wiring and tests).
+// SetAssembler replaces the context assembler (tests).
 func (r *AKB48Runtime) SetAssembler(a ContextAssembler) {
 	r.assembler = a
 }
 
-// SetHooks replaces hooks (used in tests).
+// SetHooks replaces hooks (tests).
 func (r *AKB48Runtime) SetHooks(hooks []session.HookFunc) {
 	r.hooks = hooks
 }
@@ -146,23 +187,21 @@ func (r *AKB48Runtime) SessionManager() *session.SessionManager {
 	return r.sessionManager
 }
 
-// stubAssembler: empty system prompt + session history, no cache_control.
-// Replaced by identity.ContextAssembler in Phase 2 (KLW-011).
-type stubAssembler struct{}
+// BrainAvailable reports whether GBrain is connected.
+func (r *AKB48Runtime) BrainAvailable() bool {
+	return r.bridge != nil && r.bridge.Available()
+}
 
-func (s *stubAssembler) Build(
-	sess *session.Session,
-	manager *session.SessionManager,
-	_ string,
-	_ string,
-) (string, []anthropic.MessageParam, error) {
-	turns := manager.GetContextTurns(sess)
-	msgs := make([]anthropic.MessageParam, 0, len(turns)*2)
-	for _, t := range turns {
-		msgs = append(msgs,
-			anthropic.NewUserMessage(anthropic.NewTextBlock(t.UserMessage)),
-			anthropic.NewAssistantMessage(anthropic.NewTextBlock(t.AssistantResponse)),
-		)
+func countSkillDirs(dir string) int {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
 	}
-	return "", msgs, nil
+	n := 0
+	for _, e := range entries {
+		if e.IsDir() {
+			n++
+		}
+	}
+	return n
 }
