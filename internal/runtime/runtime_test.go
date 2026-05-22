@@ -245,3 +245,59 @@ func TestRuntime_FilepathFromConfig(t *testing.T) {
 		t.Errorf("session file path issue: %v", err)
 	}
 }
+
+func TestRuntime_BrainDisabled(t *testing.T) {
+	rt, _ := testRuntime(t) // brain.enabled = false by default
+
+	if rt.BrainAvailable() {
+		t.Error("brain should not be available when disabled")
+	}
+
+	// Runtime should still start fine
+	if err := rt.Start(context.Background()); err != nil {
+		t.Fatalf("Start with brain disabled: %v", err)
+	}
+	rt.Stop()
+}
+
+func TestRuntime_BrainEnabledButUnreachable(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.Config{
+		Session: config.SessionConfig{
+			StorageDir:                 dir,
+			MaxTurnsInContext:          50,
+			MaxContextTokens:           32000,
+			ColdResumeThresholdMinutes: 30,
+		},
+		LLM: config.LLMConfig{
+			Model:               "claude-sonnet-4-6-20260326",
+			MaxToolRounds:       5,
+			MaxToolResultTokens: 500,
+		},
+		Brain: config.BrainConfig{
+			Enabled:              true,
+			GBrainCommand:        "nonexistent-binary-should-not-be-in-path",
+			GBrainArgs:           []string{"serve"},
+			ToolPrefix:           "gbrain",
+			HealthCheckIntervalS: 30,
+			MaxRestartAttempts:   1,
+		},
+	}
+
+	// Should not return error — degraded mode
+	rt, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New should succeed even with unreachable brain: %v", err)
+	}
+	if rt.BrainAvailable() {
+		t.Error("brain should not be available when binary missing")
+	}
+	rt.Stop()
+}
+
+func TestRuntime_ColdOpenerNilWhenNoBrain(t *testing.T) {
+	rt, _ := testRuntime(t)
+	if rt.coldOpener != nil {
+		t.Error("cold opener should be nil when brain is disabled")
+	}
+}
