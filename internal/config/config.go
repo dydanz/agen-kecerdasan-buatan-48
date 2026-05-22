@@ -105,6 +105,9 @@ func (c *Config) applyDefaults() {
 	if c.Adapters.Telegram.StreamingIntervalMs == 0 {
 		c.Adapters.Telegram.StreamingIntervalMs = 1000
 	}
+	if c.Adapters.Telegram.TokenEnv == "" {
+		c.Adapters.Telegram.TokenEnv = "TELEGRAM_BOT_TOKEN"
+	}
 	if c.Brain.HealthCheckIntervalS == 0 {
 		c.Brain.HealthCheckIntervalS = 30
 	}
