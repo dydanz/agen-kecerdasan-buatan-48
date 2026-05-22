@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	cliadapter "github.com/dydanz/akb48/adapters/cli"
+	tgadapter "github.com/dydanz/akb48/adapters/telegram"
 	"github.com/dydanz/akb48/internal/config"
 	"github.com/dydanz/akb48/internal/runtime"
 )
@@ -46,12 +47,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	adapter := cliadapter.New(rt.HandleMessage)
-	go func() {
-		if err := adapter.Start(ctx); err != nil {
-			slog.Error("CLI adapter error", "error", err)
+	// CLI adapter (always started)
+	if cfg.Adapters.CLI.Enabled {
+		adapter := cliadapter.New(rt.HandleMessage)
+		go func() {
+			if err := adapter.Start(ctx); err != nil {
+				slog.Error("CLI adapter error", "error", err)
+			}
+		}()
+	}
+
+	// Telegram adapter (started when enabled)
+	if cfg.Adapters.Telegram.Enabled {
+		tg, err := tgadapter.New(cfg.Adapters.Telegram, rt.HandleMessage)
+		if err != nil {
+			slog.Error("Telegram adapter init failed", "error", err)
+			os.Exit(1)
 		}
-	}()
+		go func() {
+			if err := tg.Start(ctx); err != nil && err != context.Canceled {
+				slog.Error("Telegram adapter error", "error", err)
+			}
+		}()
+		slog.Info("Telegram adapter started")
+	}
 
 	<-ctx.Done()
 	slog.Info("Shutting down...")
