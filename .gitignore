@@ -60,3 +60,7 @@ graphify-out/.graphify_chunk_*.json
 graphify-out/.graphify_old.json
 graphify-out/.graphify_incremental.json
 graphify-out/.needs_update
+
+# Built binaries
+akb48
+klawmbing
