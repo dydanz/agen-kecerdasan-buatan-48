@@ -35,9 +35,9 @@
     "semantic_hash": "2c99fc624c9d1f282a464e445886fd90"
   },
   "/Users/dandi/Sandbox/akb48/internal/llm/llm.go": {
-    "mtime": 1779234630.105951,
-    "ast_hash": "120b4269524f05163e6a0c8583bf9d3f",
-    "semantic_hash": "120b4269524f05163e6a0c8583bf9d3f"
+    "mtime": 1779502995.7170043,
+    "ast_hash": "ed99651e3c7338853ecfe7b60b677e43",
+    "semantic_hash": "ed99651e3c7338853ecfe7b60b677e43"
   },
   "/Users/dandi/Sandbox/akb48/internal/llm/doc.go": {
     "mtime": 1779023738.3790123,
@@ -75,9 +75,9 @@
     "semantic_hash": "aa59d3242e908809b82cc7f052720be1"
   },
   "/Users/dandi/Sandbox/akb48/internal/runtime/runtime.go": {
-    "mtime": 1779451480.5175738,
-    "ast_hash": "c45dbef6c5685135f8b14f254a70d6fe",
-    "semantic_hash": "c45dbef6c5685135f8b14f254a70d6fe"
+    "mtime": 1779502995.7173874,
+    "ast_hash": "fe2d036237f011fe665202dd710b2381",
+    "semantic_hash": "fe2d036237f011fe665202dd710b2381"
   },
   "/Users/dandi/Sandbox/akb48/internal/runtime/doc.go": {
     "mtime": 1779023738.3798246,
@@ -175,14 +175,14 @@
     "semantic_hash": "1719e72f0fc7e1bce06fd01bfd75b073"
   },
   "/Users/dandi/Sandbox/akb48/.claude/settings.json": {
-    "mtime": 1779021632.931232,
-    "ast_hash": "7b381ca1da76c1823339f2e2c5989f80",
-    "semantic_hash": "7b381ca1da76c1823339f2e2c5989f80"
+    "mtime": 1779504944.371926,
+    "ast_hash": "9b5e0b7b6d7f34bb9cfebc2909f55044",
+    "semantic_hash": "9b5e0b7b6d7f34bb9cfebc2909f55044"
   },
   "/Users/dandi/Sandbox/akb48/.claude/settings.local.json": {
-    "mtime": 1779499275.5541592,
-    "ast_hash": "6a9d437e87e8f4680fe8da5ba0966b37",
-    "semantic_hash": "6a9d437e87e8f4680fe8da5ba0966b37"
+    "mtime": 1779502878.5133097,
+    "ast_hash": "4f297c39d7dfaee77d5430163581b6a6",
+    "semantic_hash": "4f297c39d7dfaee77d5430163581b6a6"
   },
   "/Users/dandi/Sandbox/akb48/adapters/cli/doc.go": {
     "mtime": 1779023738.3706293,
@@ -225,9 +225,9 @@
     "semantic_hash": "d7bf17e5d2d1912b9bf294e9c26d1177"
   },
   "/Users/dandi/Sandbox/akb48/CLAUDE.md": {
-    "mtime": 1779024301.6746657,
-    "ast_hash": "21e2d6a0dce4b005bc12259048fe1bd8",
-    "semantic_hash": "21e2d6a0dce4b005bc12259048fe1bd8"
+    "mtime": 1779504944.371124,
+    "ast_hash": "d75129331b6a7935e6cbd68e878ea6b9",
+    "semantic_hash": "d75129331b6a7935e6cbd68e878ea6b9"
   },
   "/Users/dandi/Sandbox/akb48/identity/USER.md": {
     "mtime": 1779319731.6983721,
@@ -524,11 +524,6 @@
     "ast_hash": "9dab38cd33afbde2397a446f7480c9fb",
     "semantic_hash": "9dab38cd33afbde2397a446f7480c9fb"
   },
-  "/Users/dandi/Sandbox/akb48/akb48-dev-plan/README.md": {
-    "mtime": 1779023738.368199,
-    "ast_hash": "131ce5de10a01ab26e4a70785f3e899d",
-    "semantic_hash": "131ce5de10a01ab26e4a70785f3e899d"
-  },
   "/Users/dandi/Sandbox/akb48/akb48-dev-plan/phase-5-hello-world.md": {
     "mtime": 1779023738.3696353,
     "ast_hash": "4dff15dfcd634bc1b0177cdb62d1deaa",
@@ -583,5 +578,30 @@
     "mtime": 1779319731.698457,
     "ast_hash": "161d4d7417de622fcc914df6bcb048db",
     "semantic_hash": "161d4d7417de622fcc914df6bcb048db"
+  },
+  "/Users/dandi/Sandbox/akb48/tests/integration/hello_world_test.go": {
+    "mtime": 1779502995.7177474,
+    "ast_hash": "5f81bb1284dcf820b8c6dcc0850a98db",
+    "semantic_hash": "5f81bb1284dcf820b8c6dcc0850a98db"
+  },
+  "/Users/dandi/Sandbox/akb48/tests/integration/helpers_test.go": {
+    "mtime": 1779502995.7178752,
+    "ast_hash": "f00160f5f1f81a91affe8a630e1099e0",
+    "semantic_hash": "f00160f5f1f81a91affe8a630e1099e0"
+  },
+  "/Users/dandi/Sandbox/akb48/scripts/healthcheck.sh": {
+    "mtime": 1779503177.4062045,
+    "ast_hash": "f23a2faa7c9dcca8df6159621a2a1f94",
+    "semantic_hash": "f23a2faa7c9dcca8df6159621a2a1f94"
+  },
+  "/Users/dandi/Sandbox/akb48/README.md": {
+    "mtime": 1779504458.1283174,
+    "ast_hash": "0f59202c941279fa242fa5262e285649",
+    "semantic_hash": "0f59202c941279fa242fa5262e285649"
+  },
+  "/Users/dandi/Sandbox/akb48/deploy/docker-compose.yml": {
+    "mtime": 1779503177.4060578,
+    "ast_hash": "f5a7ac5f3339983337a58b666e13870c",
+    "semantic_hash": "f5a7ac5f3339983337a58b666e13870c"
   }
 }
