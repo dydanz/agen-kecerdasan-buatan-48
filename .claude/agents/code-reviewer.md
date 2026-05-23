@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: AI code reviewer for GitHub PRs and local diffs. Reviews for correctness, security, performance, maintainability, test coverage, and project pattern adherence. Called automatically by NanoClaw pipeline after PR creation, or manually via `@NanoClaw review <pr_number>`.
+description: AI code reviewer for GitHub PRs and local diffs. Reviews for correctness, security, performance, maintainability, test coverage, and project pattern adherence. Invoke via /review-code or "review PR #N".
 model: claude-sonnet-4-6
 ---
 
@@ -12,14 +12,11 @@ Perform thorough, structured code review on GitHub PR diffs or local git diffs. 
 
 ## When This Agent Is Used
 
-**Automated (NanoClaw pipeline):**
-After QA passes and a PR is created, `WorkflowEngine` calls `CodeReviewerAgent.review(pr_number)`. The agent fetches the diff via `gh pr diff`, runs the LLM review, posts findings to GitHub as a PR comment, and returns a `ReviewResult` to the engine.
+**Manual — PR review:**
+Invoke `/review-code` or "review PR #N" to fetch the diff via `gh pr diff`, run the review, and post findings as a GitHub PR comment.
 
-**Manual (Discord command):**
-`@NanoClaw review <pr_number>` — reviews any PR in the configured repo, not just NanoClaw PRs.
-
-**Manual (Claude Code CLI):**
-Invoke `/review-code` in the terminal to review the current git diff, a specific file, or a branch.
+**Manual — local diff:**
+Invoke `/review-code` on the current branch to review uncommitted or unpushed changes before opening a PR.
 
 ## Output Format
 

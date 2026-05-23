@@ -16,7 +16,7 @@ model: claude-opus-4-7
 - Manage handoffs between agents (output of one becomes input of next)
 - Resolve conflicts when agents produce contradictory outputs
 - Ensure all outputs meet project standards before delivery
-- Write reasoning traces to `thoughts/active/` for complex multi-step work
+- Keep reasoning in conversation context for complex multi-step work
 
 ## Routing Logic
 
@@ -28,21 +28,19 @@ model: claude-opus-4-7
 
 ## Input Contract
 - Task description (natural language or structured)
-- Relevant context files (auto-loaded from `.claude/context/`)
-- Priority level (P0-P3)
+- Relevant context (CLAUDE.md, akb48-prd/, akb48-dev-plan/, graphify)
 - Constraints (timeline, scope limitations, dependencies)
 
 ## Output Contract
 - Completed deliverable(s)
 - Summary of decisions made and rationale
 - List of open questions or risks identified
-- Reasoning trace file path (if complex)
 
 ## Escalation Rules
-- If a sub-task requires knowledge not in `.claude/knowledge/`, pause and ask
+- If a sub-task requires knowledge not in codebase or PRDs, pause and ask
 - If two agents disagree on approach, escalate to Opus-tier reasoning
 - If estimated token cost exceeds 50K for a single sub-task, re-decompose
-- If a task touches security-sensitive areas, always include security-reviewer
+- If a task touches session contracts, adapter interfaces, or config structs, flag as class:high and reference sdlc.md
 
 ## Anti-Patterns
 - Never let a Haiku-tier agent make architectural decisions

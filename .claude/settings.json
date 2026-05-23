@@ -2,55 +2,38 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
-      "Bash(git status)",
-      "Bash(git diff *)",
-      "Bash(git log *)",
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git checkout *)",
-      "Bash(git branch *)",
-      "Bash(git fetch *)",
-      "Bash(git pull *)",
+      "Bash(git *)",
+      "Bash(gh *)",
       "Bash(go build *)",
       "Bash(go test *)",
       "Bash(go vet *)",
       "Bash(go fmt *)",
       "Bash(go mod *)",
       "Bash(go run *)",
+      "Bash(go get *)",
+      "Bash(go clean *)",
+      "Bash(go env *)",
+      "Bash(go doc *)",
       "Bash(golangci-lint *)",
       "Bash(make *)",
-      "Bash(npm *)",
-      "Bash(pnpm *)",
-      "Bash(yarn *)",
-      "Bash(node *)",
       "Bash(docker build *)",
       "Bash(docker compose *)",
       "Bash(docker ps *)",
       "Bash(docker logs *)",
-      "Bash(terraform fmt *)",
-      "Bash(terraform validate *)",
-      "Bash(terraform plan *)",
-      "Bash(kubectl get *)",
-      "Bash(kubectl describe *)",
-      "Bash(kubectl logs *)",
+      "Bash(docker restart *)",
       "Bash(curl *)",
       "Bash(ls *)",
       "Bash(find *)",
+      "Bash(grep *)",
       "Bash(cat *)",
       "Bash(echo *)",
-      "Bash(cd *)"
+      "Bash(graphify *)"
     ],
     "deny": [
       "Bash(rm -rf *)",
       "Bash(git push --force *)",
       "Bash(git reset --hard *)",
-      "Bash(kubectl delete *)",
-      "Bash(kubectl apply *)",
-      "Bash(terraform apply *)",
-      "Bash(terraform destroy *)",
-      "Bash(docker rm -f *)",
-      "Bash(drop table *)",
-      "Bash(truncate *)"
+      "Bash(docker rm -f *)"
     ]
   },
   "hooks": {
@@ -60,23 +43,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"process.stderr.write('\\n\ud83c\udfd7\ufe0f  Full-Stack Project | Claude Code Workspace\\n\ud83d\udce6 Domains: Frontend \u00b7 Backend (Go) \u00b7 Infrastructure \u00b7 Testing \u00b7 Product\\n\u26a1 Commands: /analyze_codebase /plan_feature /generate_prd /design_architecture /review_code /setup_infra /run_tests\\n\\n');\"",
+            "command": "node -e \"process.stderr.write('\\nAKB48 — Go AI agent runtime | Solo operator: Dandi\\nStack: Go 1.25 · discordgo · Claude API · Docker · GitHub Actions\\nSDLC: .claude/agents/sdlc.md | Graph: graphify query \"<question>\" | Commands: /analyze_codebase /plan_feature /review_code /run_tests\\n\\n');\"",
             "timeout": 5
           }
         ]
       }
     ],
     "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node -e \"const cmd = process.env.CLAUDE_TOOL_INPUT || ''; const dangerous = ['git push --force', 'git reset --hard', 'rm -rf', 'terraform destroy', 'terraform apply', 'kubectl delete', 'kubectl apply']; const found = dangerous.find(d => cmd.includes(d)); if (found) { process.stderr.write('\u26a0\ufe0f  WARNING: Potentially destructive command detected: ' + found + '\\nPlease confirm this is intentional.\\n'); process.exit(1); }\"",
-            "timeout": 5
-          }
-        ]
-      },
       {
         "matcher": "Bash",
         "hooks": [
