@@ -1,0 +1,119 @@
+name: Hotfix Follow-up Enforcement
+
+# Runs hourly. Checks for hotfix PRs merged 24-48h ago missing a post-merge spec.
+# Creates a hotfix-followup issue assigned to the PR merger if spec is absent.
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:       # Manual trigger for testing
+
+jobs:
+  check-hotfix-specs:
+    name: Check hotfix post-merge specs
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Find unresolved hotfix merges
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const now = new Date();
+            const windowStart = new Date(now - 48 * 60 * 60 * 1000); // 48h ago
+            const windowEnd   = new Date(now - 24 * 60 * 60 * 1000); // 24h ago
+
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              base: 'main',
+              per_page: 50,
+              sort: 'updated',
+              direction: 'desc',
+            });
+
+            const hotfixMerges = prs.data.filter(pr => {
+              if (!pr.merged_at) return false;
+              if (!pr.head.ref.startsWith('hotfix/')) return false;
+              const mergedAt = new Date(pr.merged_at);
+              return mergedAt >= windowStart && mergedAt <= windowEnd;
+            });
+
+            console.log(`Found ${hotfixMerges.length} hotfix PR(s) in the 24-48h window.`);
+
+            for (const pr of hotfixMerges) {
+              const prBody = pr.body || '';
+              const prNumber = pr.number;
+
+              const issueMatches = [...prBody.matchAll(/(?:Closes|Fixes|Resolves)\s+#(\d+)/gi)];
+              const issueNumbers = issueMatches.map(m => parseInt(m[1]));
+
+              let specFound = false;
+
+              if (prBody.includes('## Post-merge spec') || (prBody.includes('## What broke') && prBody.length > 400)) {
+                specFound = true;
+              }
+
+              if (!specFound) {
+                for (const issueNum of issueNumbers) {
+                  try {
+                    const issue = await github.rest.issues.get({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issueNum,
+                    });
+                    if (issue.data.labels.map(l => l.name).includes('spec-added')) {
+                      specFound = true;
+                      break;
+                    }
+                  } catch (e) {
+                    console.log(`Could not fetch issue #${issueNum}: ${e.message}`);
+                  }
+                }
+              }
+
+              if (specFound) {
+                console.log(`PR #${prNumber}: spec found — no follow-up needed.`);
+                continue;
+              }
+
+              const existingIssues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: 'hotfix-followup',
+                state: 'open',
+              });
+
+              if (existingIssues.data.some(i => i.body && i.body.includes(`#${prNumber}`))) {
+                console.log(`PR #${prNumber}: follow-up issue already exists.`);
+                continue;
+              }
+
+              const mergedBy = pr.merged_by ? pr.merged_by.login : 'unknown';
+
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `[hotfix-followup] Post-merge spec missing for PR #${prNumber}`,
+                body: `## Hotfix Follow-up Required
+
+PR #${prNumber} (\`${pr.head.ref}\`) was merged at ${pr.merged_at} but no post-merge spec was found within 24 hours.
+
+**Required within 24h of merge (now overdue):**
+
+1. **Post-merge spec.** Brief writeup: what broke, what was done, what's deployed. Add to the linked issue body and label it \`spec-added\`.
+2. **ADR (if needed).** If the fix revealed an architectural gap, draft an ADR in \`akb48-adr/\` and reference it from the PR.
+
+**Original PR:** #${prNumber}
+**Branch:** \`${pr.head.ref}\`
+**Merged by:** @${mergedBy}
+**Merged at:** ${pr.merged_at}
+
+---
+Auto-created by hotfix follow-up bot. Close once spec is added and issue is labeled \`spec-added\`.`,
+                labels: ['hotfix-followup', 'class:hotfix'],
+                assignees: mergedBy !== 'unknown' ? [mergedBy] : [],
+              });
+            }

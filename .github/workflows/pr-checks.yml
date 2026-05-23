@@ -1,0 +1,53 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  lint-and-test:
+    name: Lint, Format, Tests
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test ./... -timeout 120s
+
+  deployment-readiness:
+    name: PR Description Check
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check PR description completeness
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const checks = [
+              { pattern: /## Summary/,                                    label: 'Summary section' },
+              { pattern: /## Risk/,                                       label: 'Risk section' },
+              { pattern: /## Rollback/,                                   label: 'Rollback section' },
+              { pattern: /Closes #\d+|Fixes #\d+|Resolves #\d+/i,        label: 'Linked issue (Closes #N)' },
+            ];
+            const missing = checks.filter(c => !c.pattern.test(body)).map(c => c.label);
+            if (missing.length > 0) {
+              core.setFailed(`PR description missing: ${missing.join(', ')}`);
+            } else {
+              console.log('PR description check passed.');
+            }

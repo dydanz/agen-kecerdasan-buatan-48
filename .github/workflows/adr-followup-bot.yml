@@ -1,0 +1,92 @@
+name: ADR Follow-up Bot
+
+# Watches for PRs merged with 'adr-required' label.
+# After 48h, if no ADR is linked, opens a reminder issue.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+jobs:
+  check-adr-followup:
+    name: Check pending ADRs
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Find merged PRs with adr-required label lacking ADR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const now = new Date();
+            const window48h = new Date(now - 48 * 60 * 60 * 1000);
+            const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              base: 'main',
+              per_page: 50,
+              sort: 'updated',
+              direction: 'desc',
+            });
+
+            const adrPending = prs.data.filter(pr => {
+              if (!pr.merged_at) return false;
+              const mergedAt = new Date(pr.merged_at);
+              if (mergedAt < sevenDaysAgo) return false;
+              if (mergedAt > window48h) return false;
+              return pr.labels && pr.labels.some(l => l.name === 'adr-required');
+            });
+
+            console.log(`Found ${adrPending.length} PR(s) with adr-required past 48h.`);
+
+            for (const pr of adrPending) {
+              const prBody = pr.body || '';
+              const prNumber = pr.number;
+
+              const hasAdr = /ADR[-\s]*\d+|akb48-adr\//i.test(prBody);
+              if (hasAdr) {
+                console.log(`PR #${prNumber}: ADR link found — no follow-up needed.`);
+                continue;
+              }
+
+              const existing = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: 'adr-required',
+                state: 'open',
+              });
+
+              if (existing.data.some(i => i.body && i.body.includes(`#${prNumber}`))) {
+                console.log(`PR #${prNumber}: ADR follow-up issue already exists.`);
+                continue;
+              }
+
+              const mergedBy = pr.merged_by ? pr.merged_by.login : 'unknown';
+
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `[adr-followup] ADR missing for PR #${prNumber}`,
+                body: `## ADR Required
+
+PR #${prNumber} (\`${pr.head.ref}\`) was merged at ${pr.merged_at} with the \`adr-required\` label but no ADR has been linked after 48 hours.
+
+**Action required:**
+
+Draft an ADR for the architectural decision made in this PR. Add it to \`akb48-adr/\` using the template at \`akb48-adr/0000-template.md\`. Then reference it in the original PR description or linked issue.
+
+**Original PR:** #${prNumber}
+**Merged by:** @${mergedBy}
+**Merged at:** ${pr.merged_at}
+
+---
+Auto-created by ADR follow-up bot. Close once the ADR is committed and linked.`,
+                labels: ['adr-required'],
+                assignees: mergedBy !== 'unknown' ? [mergedBy] : [],
+              });
+            }
