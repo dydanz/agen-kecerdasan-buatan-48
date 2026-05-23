@@ -1,6 +1,23 @@
 version: "3.9"
 
 services:
+  akb48:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ../.env
+    volumes:
+      - sessions:/app/sessions
+      - logs:/app/logs
+      - ./config.docker.toml:/app/config.toml:ro
+    # Uncomment when brain.enabled = true in config.toml:
+    # depends_on:
+    #   - gbrain
+
+  # GBrain + Postgres — only needed when brain.enabled = true in config.toml.
+  # akb48 starts in degraded mode (brain tools unavailable) if these are not running.
+
   postgres:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
@@ -26,6 +43,8 @@ services:
 
 volumes:
   pgdata:
+  sessions:
+  logs:
 
 secrets:
   pg_password:

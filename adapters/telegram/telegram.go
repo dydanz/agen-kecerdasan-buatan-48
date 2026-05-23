@@ -12,6 +12,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
+	"github.com/dydanz/akb48/adapters/shared"
 	"github.com/dydanz/akb48/internal/config"
 	"github.com/dydanz/akb48/internal/runtime"
 	"github.com/dydanz/akb48/internal/types"
@@ -108,7 +109,7 @@ func (a *Adapter) onMessage(ctx context.Context, update tgbotapi.Update) {
 
 // send sends a plain (non-streaming) message, splitting if needed.
 func (a *Adapter) send(chatID int64, text string) {
-	for _, part := range splitMessage(text, maxMsgLen) {
+	for _, part := range shared.SplitMessage(text, maxMsgLen) {
 		if _, err := a.bot.Send(tgbotapi.NewMessage(chatID, part)); err != nil {
 			slog.Warn("Telegram send error", "error", err)
 		}
@@ -174,7 +175,7 @@ func (a *Adapter) editFinal(chatID int64, msgID int, text string) error {
 	if text == "" {
 		text = "(empty response)"
 	}
-	parts := splitMessage(text, maxMsgLen)
+	parts := shared.SplitMessage(text, maxMsgLen)
 
 	edit := tgbotapi.NewEditMessageText(chatID, msgID, parts[0])
 	if _, err := a.bot.Send(edit); err != nil {
