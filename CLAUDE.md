@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AKB48 is a **thin, self-hosted AI agent runtime** ("claw") for a solo operator. It connects Telegram/Discord to a compounding knowledge brain (GBrain), routes user intent to markdown skill files, and gets smarter without code deploys. The philosophy is **"thin harness, fat skills"**: the runtime is ~2,000–2,500 lines of Go; the intelligence lives in skill files and GBrain.
+AKB48 (Agen Kecerdasan Buatan 48) is a **thin, self-hosted AI agent runtime** ("claw") for a solo operator. It connects Telegram/Discord to a compounding knowledge brain (GBrain), routes user intent to markdown skill files, and gets smarter without code deploys. The philosophy is **"thin harness, fat skills"**: the runtime is ~2,000–2,500 lines of Go; the intelligence lives in skill files and GBrain.
 
 The project is currently in **design/planning phase**. All PRDs are in `akb48-prd/`, research in `akb48-rsh/`, and development/implementation plan are in `akb48-dev-plan/`. The first milestone is "Hello World" (PRDs 01–05), which proves the chat → LLM → brain → persistence pipeline end-to-end.
 
@@ -252,6 +252,7 @@ Body: step-by-step process, output format, constraints. Keep under 2,000 tokens.
 | PRD-03 | GBrain Integration — MCP client, tool discovery | PRD-01 |
 | PRD-04 | Identity & Skill System — context assembly, skill resolver | PRD-01 |
 | PRD-05 | Session Management — JSONL persistence, post-turn hooks | PRD-01, PRD-02 |
+| PRD-xx | <Placeholder for future development> | PRD-x1, PRD-x2 |
 
 Read the full PRD before implementing any component. Each PRD contains the complete interface contract, data types, error handling table, and acceptance criteria.
 
@@ -292,7 +293,7 @@ Rules:
 
 ## SDLC
 
-This project follows a lightweight 5-phase SDLC. Full agent: `.claude/agents/sdlc.md`.
+This project follows a lightweight multi-phase SDLC. Full agent: `.claude/agents/sdlc.md`.
 
 **Three rules always active:**
 1. **Draft, don't auto-execute.** Propose every GitHub action (issue, PR, comment). Wait for explicit operator confirmation.
