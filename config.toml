@@ -1,5 +1,5 @@
 [llm]
-model = "claude-sonnet-4-6-20260326"
+model = "claude-sonnet-4-6"
 extraction_model = "claude-haiku-4-5-20251001"
 api_key_env = "ANTHROPIC_API_KEY"
 max_tokens = 4096
