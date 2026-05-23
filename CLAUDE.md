@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AKB48 is a **thin, self-hosted AI agent runtime** ("claw") for a solo operator. It connects Telegram/Discord to a compounding knowledge brain (GBrain), routes user intent to markdown skill files, and gets smarter without code deploys. The philosophy is **"thin harness, fat skills"**: the runtime is ~2,000–2,500 lines of Go; the intelligence lives in skill files and GBrain.
 
-The project is currently in **design/planning phase**. All PRDs are in `akb48-prd/`, research in `akb48-rsh/`. No implementation exists yet. The first milestone is "Hello World" (PRDs 01–05), which proves the chat → LLM → brain → persistence pipeline end-to-end.
+The project is currently in **design/planning phase**. All PRDs are in `akb48-prd/`, research in `akb48-rsh/`, and development/implementation plan are in `akb48-dev-plan/`. The first milestone is "Hello World" (PRDs 01–05), which proves the chat → LLM → brain → persistence pipeline end-to-end.
 
 ---
 
@@ -287,3 +287,27 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+---
+
+## SDLC
+
+This project follows a lightweight 5-phase SDLC. Full agent: `.claude/agents/sdlc.md`.
+
+**Three rules always active:**
+1. **Draft, don't auto-execute.** Propose every GitHub action (issue, PR, comment). Wait for explicit operator confirmation.
+2. **Event-driven.** Act on invocation or hook events. Never poll.
+3. **Proportional.** Read `class:low/medium/high/hotfix` from issue labels. Scale ceremony to that class.
+
+| Class | Spec | Gate | Test | Branch |
+|---|---|---|---|---|
+| `class:low` | None | Self-approval | CI | `fix/<klw-id>-slug` |
+| `class:medium` | Spec in issue body | Self `/approve-spec` | `go test ./...` | `feature/<klw-id>-slug` |
+| `class:high` | TRD in `akb48-prd/` | Self-approval + 2nd review | Full suite + manual | `feature/<klw-id>-slug` |
+| `class:hotfix` | Skip; post-merge ≤24h | Self-approval + smoke | Smoke | `hotfix/<klw-id>-slug` |
+
+**Ticket convention:** KLW-XXX (existing). PR description must include `Closes #N` to link GitHub issue.
+
+**ADRs:** in `akb48-adr/`. Add `adr-required` label to any PR affecting component interfaces, session contracts, runtime wiring, or conventions. ADR bot enforces within 48h of merge.
+
+**Dev plans:** in `akb48-dev-plan/`. Update if implementation deviates from plan.
