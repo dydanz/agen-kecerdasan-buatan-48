@@ -1,0 +1,55 @@
+# Docker-specific config overrides.
+# Mounted at /app/config.toml inside the container (see docker-compose.yml).
+# Keep in sync with root config.toml for non-Docker fields.
+
+[llm]
+model = "claude-sonnet-4-6-20260326"
+extraction_model = "claude-haiku-4-5-20251001"
+api_key_env = "ANTHROPIC_API_KEY"
+max_tokens = 4096
+max_tool_rounds = 5
+max_tool_result_tokens = 500
+
+[adapters.cli]
+# Disabled in Docker — no interactive stdin. Use Discord or Telegram.
+enabled = false
+
+[adapters.discord]
+enabled = true
+token_env = "DISCORD_BOT_TOKEN"
+allowed_user_ids = ["691898565261393948", "1486543684374757416"]
+streaming_interval_ms = 1000
+slash_commands = true
+slash_command_guild_id = ""
+
+[adapters.telegram]
+enabled = false
+token_env = "TELEGRAM_BOT_TOKEN"
+allowed_user_ids = []
+streaming_interval_ms = 1000
+
+[brain]
+enabled = false
+mcp_transport = "stdio"
+gbrain_command = "gbrain"
+gbrain_args = ["serve"]
+gbrain_working_dir = "/brain"
+tool_prefix = "gbrain"
+health_check_interval_s = 30
+max_restart_attempts = 3
+
+[session]
+# Absolute paths — matched to volume mounts in docker-compose.yml
+storage_dir = "/app/sessions"
+max_turns_in_context = 50
+max_turns_before_compaction = 30
+max_file_size_mb = 10
+max_context_tokens = 32000
+cold_resume_threshold_minutes = 30
+load_on_startup = true
+
+[skills]
+dir = "/app/skills"
+
+[identity]
+dir = "/app/identity"

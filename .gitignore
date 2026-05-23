@@ -64,3 +64,6 @@ graphify-out/.needs_update
 # Built binaries
 akb48
 klawmbing
+
+# Docker secrets (never commit)
+deploy/secrets/

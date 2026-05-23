@@ -1,0 +1,27 @@
+.git/
+.github/
+.claude/
+
+# Runtime data (mounted as volumes)
+sessions/
+logs/
+
+# Docs and planning (not needed in image)
+akb48-prd/
+akb48-rsh/
+akb48-dev-plan/
+akb48-adr/
+graphify-out/
+docs/
+
+# Secrets
+deploy/secrets/
+.env
+.env.*
+
+# Tests
+tests/
+
+# Local build artifacts
+akb48
+skills-lock.json
