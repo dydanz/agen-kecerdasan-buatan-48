@@ -62,8 +62,8 @@ graphify-out/.graphify_incremental.json
 graphify-out/.needs_update
 
 # Built binaries
-akb48
-klawmbing
+/akb48
+/klawmbing
 
 # Docker secrets (never commit)
 deploy/secrets/

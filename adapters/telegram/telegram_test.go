@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dydanz/akb48/adapters/shared"
 	"github.com/dydanz/akb48/internal/config"
 )
 
 // --- splitMessage tests ---
 
 func TestSplitMessage_Short(t *testing.T) {
-	parts := splitMessage("hello world", 4096)
+	parts := shared.SplitMessage("hello world", 4096)
 	if len(parts) != 1 || parts[0] != "hello world" {
 		t.Errorf("unexpected: %v", parts)
 	}
@@ -20,7 +21,7 @@ func TestSplitMessage_Short(t *testing.T) {
 
 func TestSplitMessage_ExactLimit(t *testing.T) {
 	text := strings.Repeat("a", 4096)
-	parts := splitMessage(text, 4096)
+	parts := shared.SplitMessage(text, 4096)
 	if len(parts) != 1 {
 		t.Errorf("expected 1 part, got %d", len(parts))
 	}
@@ -31,7 +32,7 @@ func TestSplitMessage_ParagraphSplit(t *testing.T) {
 	second := strings.Repeat("b", 2000)
 	text := first + "\n\n" + second
 
-	parts := splitMessage(text, 4096)
+	parts := shared.SplitMessage(text, 4096)
 	if len(parts) != 2 {
 		t.Fatalf("expected 2 parts, got %d: %v", len(parts), parts)
 	}
@@ -49,7 +50,7 @@ func TestSplitMessage_NewlineFallback(t *testing.T) {
 	second := strings.Repeat("b", 2000)
 	text := first + "\n" + second
 
-	parts := splitMessage(text, 4096)
+	parts := shared.SplitMessage(text, 4096)
 	if len(parts) != 2 {
 		t.Fatalf("expected 2 parts, got %d", len(parts))
 	}
@@ -58,7 +59,7 @@ func TestSplitMessage_NewlineFallback(t *testing.T) {
 func TestSplitMessage_HardCut(t *testing.T) {
 	// 5000 chars, no newlines — hard cut at 4096
 	text := strings.Repeat("a", 5000)
-	parts := splitMessage(text, 4096)
+	parts := shared.SplitMessage(text, 4096)
 	if len(parts) != 2 {
 		t.Fatalf("expected 2 parts, got %d", len(parts))
 	}
@@ -73,7 +74,7 @@ func TestSplitMessage_HardCut(t *testing.T) {
 func TestSplitMessage_ThreeParts(t *testing.T) {
 	// 9500 chars → 3 parts
 	text := strings.Repeat("x", 9500)
-	parts := splitMessage(text, 4096)
+	parts := shared.SplitMessage(text, 4096)
 	if len(parts) != 3 {
 		t.Fatalf("expected 3 parts, got %d", len(parts))
 	}
@@ -155,7 +156,7 @@ func TestSendStreaming_EmptyTokens(t *testing.T) {
 
 	// editFinal with empty text should use "(empty response)"
 	// We verify this indirectly via splitMessage
-	parts := splitMessage("", 4096)
+	parts := shared.SplitMessage("", 4096)
 	// empty string returns [""] which editFinal handles
 	if len(parts) != 1 {
 		t.Errorf("unexpected parts for empty string: %v", parts)

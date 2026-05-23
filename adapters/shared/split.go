@@ -1,11 +1,10 @@
-package telegram
+package shared
 
 import "strings"
 
-// splitMessage splits text into chunks of at most maxLen bytes.
-// Prefers splitting at double-newline (paragraph) boundaries,
-// then single newline, then hard cut.
-func splitMessage(text string, maxLen int) []string {
+// SplitMessage splits text into chunks of at most maxLen bytes.
+// Prefers splitting at double-newline (paragraph) then single newline then hard cut.
+func SplitMessage(text string, maxLen int) []string {
 	if len(text) <= maxLen {
 		return []string{text}
 	}

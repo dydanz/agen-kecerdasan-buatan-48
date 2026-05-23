@@ -28,9 +28,19 @@ type TelegramConfig struct {
 	StreamingIntervalMs int     `toml:"streaming_interval_ms"`
 }
 
+type DiscordConfig struct {
+	Enabled             bool     `toml:"enabled"`
+	TokenEnv            string   `toml:"token_env"`
+	AllowedUserIDs      []string `toml:"allowed_user_ids"`
+	StreamingIntervalMs int      `toml:"streaming_interval_ms"`
+	SlashCommands       bool     `toml:"slash_commands"`
+	SlashCommandGuildID string   `toml:"slash_command_guild_id"`
+}
+
 type AdaptersConfig struct {
 	CLI      CLIConfig      `toml:"cli"`
 	Telegram TelegramConfig `toml:"telegram"`
+	Discord  DiscordConfig  `toml:"discord"`
 }
 
 type BrainConfig struct {
@@ -107,6 +117,12 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Adapters.Telegram.TokenEnv == "" {
 		c.Adapters.Telegram.TokenEnv = "TELEGRAM_BOT_TOKEN"
+	}
+	if c.Adapters.Discord.TokenEnv == "" {
+		c.Adapters.Discord.TokenEnv = "DISCORD_BOT_TOKEN"
+	}
+	if c.Adapters.Discord.StreamingIntervalMs == 0 {
+		c.Adapters.Discord.StreamingIntervalMs = 1000
 	}
 	if c.Brain.HealthCheckIntervalS == 0 {
 		c.Brain.HealthCheckIntervalS = 30
