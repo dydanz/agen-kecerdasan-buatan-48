@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: brain
+      POSTGRES_USER: brain
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    secrets:
+      - pg_password
+
+  gbrain:
+    image: ghcr.io/gbrain/gbrain:latest
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://brain@postgres/brain
+    volumes:
+      - ~/brain:/brain
+    command: ["serve", "--dir", "/brain"]
+
+volumes:
+  pgdata:
+
+secrets:
+  pg_password:
+    file: ./secrets/pg_password

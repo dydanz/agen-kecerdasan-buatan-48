@@ -1,0 +1,20 @@
+[Unit]
+Description=AKB48 AI Agent Runtime
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=dandi
+WorkingDirectory=/home/dandi/akb48
+EnvironmentFile=/home/dandi/.env
+ExecStartPre=/home/dandi/akb48/akb48 --validate
+ExecStart=/home/dandi/akb48/akb48
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=akb48
+
+[Install]
+WantedBy=multi-user.target
