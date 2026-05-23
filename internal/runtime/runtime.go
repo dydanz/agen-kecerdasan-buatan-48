@@ -36,7 +36,7 @@ type ContextAssembler interface {
 // AKB48Runtime wires all components together.
 type AKB48Runtime struct {
 	cfg            *config.Config
-	llmCaller      *llm.Caller
+	llmCaller      llm.CallerInterface
 	registry       *tools.Registry
 	sessionManager *session.SessionManager
 	assembler      ContextAssembler
@@ -175,6 +175,16 @@ func (r *AKB48Runtime) Stop() error {
 // SetAssembler replaces the context assembler (tests).
 func (r *AKB48Runtime) SetAssembler(a ContextAssembler) {
 	r.assembler = a
+}
+
+// SetLLMCaller replaces the LLM caller (tests).
+func (r *AKB48Runtime) SetLLMCaller(c llm.CallerInterface) {
+	r.llmCaller = c
+}
+
+// SetColdOpener replaces the cold opener (tests).
+func (r *AKB48Runtime) SetColdOpener(c *session.ColdOpener) {
+	r.coldOpener = c
 }
 
 // SetHooks replaces hooks (tests).

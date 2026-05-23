@@ -39,6 +39,11 @@ type CallResult struct {
 	LatencyMs  int64
 }
 
+// CallerInterface is the interface for LLM call execution (used for test injection).
+type CallerInterface interface {
+	Call(ctx context.Context, params CallParams) (*CallResult, error)
+}
+
 // Caller wraps the Anthropic SDK and executes the tool loop.
 type Caller struct {
 	cfg      *config.Config
