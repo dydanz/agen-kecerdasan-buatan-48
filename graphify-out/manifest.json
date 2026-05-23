@@ -1,0 +1,587 @@
+{
+  "/Users/dandi/Sandbox/akb48/skills-lock.json": {
+    "mtime": 1779026538.0674467,
+    "ast_hash": "9af5d077e8f84c6680e27c8d1a58ec10",
+    "semantic_hash": "9af5d077e8f84c6680e27c8d1a58ec10"
+  },
+  "/Users/dandi/Sandbox/akb48/cmd/akb48/main.go": {
+    "mtime": 1779489946.818434,
+    "ast_hash": "8a1b0f8aeb3ebcdbb1c99d47d949b7c4",
+    "semantic_hash": "8a1b0f8aeb3ebcdbb1c99d47d949b7c4"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/tools/tools.go": {
+    "mtime": 1779023738.38114,
+    "ast_hash": "815e91628bb5b699333b015774024ef9",
+    "semantic_hash": "815e91628bb5b699333b015774024ef9"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/tools/doc.go": {
+    "mtime": 1779023738.3808408,
+    "ast_hash": "a9960db5ef7b188e346c5e6005a5b843",
+    "semantic_hash": "a9960db5ef7b188e346c5e6005a5b843"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/tools/tools_test.go": {
+    "mtime": 1779023738.381388,
+    "ast_hash": "da6055a22930839cb9bb6e85d7ef07f5",
+    "semantic_hash": "da6055a22930839cb9bb6e85d7ef07f5"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/types/types.go": {
+    "mtime": 1779023738.3820956,
+    "ast_hash": "d021077e3ac1c6af4bd782dec186020a",
+    "semantic_hash": "d021077e3ac1c6af4bd782dec186020a"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/types/doc.go": {
+    "mtime": 1779023738.3818882,
+    "ast_hash": "2c99fc624c9d1f282a464e445886fd90",
+    "semantic_hash": "2c99fc624c9d1f282a464e445886fd90"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/llm/llm.go": {
+    "mtime": 1779234630.105951,
+    "ast_hash": "120b4269524f05163e6a0c8583bf9d3f",
+    "semantic_hash": "120b4269524f05163e6a0c8583bf9d3f"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/llm/doc.go": {
+    "mtime": 1779023738.3790123,
+    "ast_hash": "9849433bc5d5526304630713bc481215",
+    "semantic_hash": "9849433bc5d5526304630713bc481215"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/llm/llm_test.go": {
+    "mtime": 1779234630.1060975,
+    "ast_hash": "9bf84d4e8ff9888c051975f6b085d4eb",
+    "semantic_hash": "9bf84d4e8ff9888c051975f6b085d4eb"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/identity/assembler.go": {
+    "mtime": 1779234630.1054864,
+    "ast_hash": "69a963ebc1f86c217b50cb074c1df990",
+    "semantic_hash": "69a963ebc1f86c217b50cb074c1df990"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/identity/assembler_test.go": {
+    "mtime": 1779234630.1056468,
+    "ast_hash": "7e22cbcd70b07c4625080c2c6c290d83",
+    "semantic_hash": "7e22cbcd70b07c4625080c2c6c290d83"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/identity/doc.go": {
+    "mtime": 1779023738.3788798,
+    "ast_hash": "2dbf6959c7b699fef4a6489b29fe5b93",
+    "semantic_hash": "2dbf6959c7b699fef4a6489b29fe5b93"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/config/config.go": {
+    "mtime": 1779489946.819534,
+    "ast_hash": "4105f114133bca6c83b7777d7a74348d",
+    "semantic_hash": "4105f114133bca6c83b7777d7a74348d"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/config/config_test.go": {
+    "mtime": 1779023738.3784308,
+    "ast_hash": "aa59d3242e908809b82cc7f052720be1",
+    "semantic_hash": "aa59d3242e908809b82cc7f052720be1"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/runtime/runtime.go": {
+    "mtime": 1779451480.5175738,
+    "ast_hash": "c45dbef6c5685135f8b14f254a70d6fe",
+    "semantic_hash": "c45dbef6c5685135f8b14f254a70d6fe"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/runtime/doc.go": {
+    "mtime": 1779023738.3798246,
+    "ast_hash": "861b403c8deedebeca92eb50c52cd911",
+    "semantic_hash": "861b403c8deedebeca92eb50c52cd911"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/runtime/runtime_test.go": {
+    "mtime": 1779451480.51776,
+    "ast_hash": "60001d734054db9ab546a14e818b827d",
+    "semantic_hash": "60001d734054db9ab546a14e818b827d"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/brain/bridge.go": {
+    "mtime": 1779407252.3514857,
+    "ast_hash": "b3f52066279491bc49a77e32af37535d",
+    "semantic_hash": "b3f52066279491bc49a77e32af37535d"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/brain/bridge_test.go": {
+    "mtime": 1779407252.351635,
+    "ast_hash": "c3d96fed8a4575498d8a68afc3dd4362",
+    "semantic_hash": "c3d96fed8a4575498d8a68afc3dd4362"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/brain/mcp_client.go": {
+    "mtime": 1779407105.3106017,
+    "ast_hash": "4416dbc77c9cc24eeed76e3488c4f031",
+    "semantic_hash": "4416dbc77c9cc24eeed76e3488c4f031"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/brain/doc.go": {
+    "mtime": 1779023738.3779132,
+    "ast_hash": "78036efb52900e725e1970e6161d3281",
+    "semantic_hash": "78036efb52900e725e1970e6161d3281"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/brain/mcp_client_test.go": {
+    "mtime": 1779407105.3107996,
+    "ast_hash": "3088c00eab782aca78971b3c7f468298",
+    "semantic_hash": "3088c00eab782aca78971b3c7f468298"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/skills/resolver_test.go": {
+    "mtime": 1779149936.3449166,
+    "ast_hash": "7e86725c4600fca89c5d967873b0652a",
+    "semantic_hash": "7e86725c4600fca89c5d967873b0652a"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/skills/resolver.go": {
+    "mtime": 1779149936.3447826,
+    "ast_hash": "f221de0c7f48bb74569681d128356eab",
+    "semantic_hash": "f221de0c7f48bb74569681d128356eab"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/skills/doc.go": {
+    "mtime": 1779023738.380231,
+    "ast_hash": "52b9d9a9a0163d7cd662d483c480c562",
+    "semantic_hash": "52b9d9a9a0163d7cd662d483c480c562"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/session/hooks.go": {
+    "mtime": 1779073470.1094291,
+    "ast_hash": "1256db5f0345776ac510d33bb37cabd2",
+    "semantic_hash": "1256db5f0345776ac510d33bb37cabd2"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/session/manager_test.go": {
+    "mtime": 1779073373.0233696,
+    "ast_hash": "566a923ef188214cc1a413a1d09e9320",
+    "semantic_hash": "566a923ef188214cc1a413a1d09e9320"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/session/cold_test.go": {
+    "mtime": 1779319818.0148118,
+    "ast_hash": "5e0a5aabce8fe2e99b211e53cc726594",
+    "semantic_hash": "5e0a5aabce8fe2e99b211e53cc726594"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/session/session.go": {
+    "mtime": 1779073142.3442674,
+    "ast_hash": "eef8b2ec32b112ce1eaa6ddf271399eb",
+    "semantic_hash": "eef8b2ec32b112ce1eaa6ddf271399eb"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/session/doc.go": {
+    "mtime": 1779023738.3800457,
+    "ast_hash": "3990deb8f5b36f54bf7504d366963dc8",
+    "semantic_hash": "3990deb8f5b36f54bf7504d366963dc8"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/session/cold.go": {
+    "mtime": 1779319818.014698,
+    "ast_hash": "972693a75c0f5f9ed586a456a707fd5c",
+    "semantic_hash": "972693a75c0f5f9ed586a456a707fd5c"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/session/hooks_test.go": {
+    "mtime": 1779073470.109678,
+    "ast_hash": "0aec79b48f4975348deeb6ba9bc8c122",
+    "semantic_hash": "0aec79b48f4975348deeb6ba9bc8c122"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/session/session_test.go": {
+    "mtime": 1779073142.3445654,
+    "ast_hash": "5624d8abe9080d5293b49e0a9dd70dd9",
+    "semantic_hash": "5624d8abe9080d5293b49e0a9dd70dd9"
+  },
+  "/Users/dandi/Sandbox/akb48/internal/session/manager.go": {
+    "mtime": 1779073373.0231256,
+    "ast_hash": "1719e72f0fc7e1bce06fd01bfd75b073",
+    "semantic_hash": "1719e72f0fc7e1bce06fd01bfd75b073"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/settings.json": {
+    "mtime": 1779021632.931232,
+    "ast_hash": "7b381ca1da76c1823339f2e2c5989f80",
+    "semantic_hash": "7b381ca1da76c1823339f2e2c5989f80"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/settings.local.json": {
+    "mtime": 1779499275.5541592,
+    "ast_hash": "6a9d437e87e8f4680fe8da5ba0966b37",
+    "semantic_hash": "6a9d437e87e8f4680fe8da5ba0966b37"
+  },
+  "/Users/dandi/Sandbox/akb48/adapters/cli/doc.go": {
+    "mtime": 1779023738.3706293,
+    "ast_hash": "3bb48cdecaca2ac7c3fa1fad9ce78869",
+    "semantic_hash": "3bb48cdecaca2ac7c3fa1fad9ce78869"
+  },
+  "/Users/dandi/Sandbox/akb48/adapters/cli/cli.go": {
+    "mtime": 1779080012.0317097,
+    "ast_hash": "0d28fb42f840e0ed370e28f1f5a27084",
+    "semantic_hash": "0d28fb42f840e0ed370e28f1f5a27084"
+  },
+  "/Users/dandi/Sandbox/akb48/adapters/cli/cli_test.go": {
+    "mtime": 1779080012.0320399,
+    "ast_hash": "3a69352d9ed8937792235070e8465cec",
+    "semantic_hash": "3a69352d9ed8937792235070e8465cec"
+  },
+  "/Users/dandi/Sandbox/akb48/adapters/telegram/telegram.go": {
+    "mtime": 1779489946.8178592,
+    "ast_hash": "a9429982a4af7081d150760068adf48b",
+    "semantic_hash": "a9429982a4af7081d150760068adf48b"
+  },
+  "/Users/dandi/Sandbox/akb48/adapters/telegram/doc.go": {
+    "mtime": 1779023738.370903,
+    "ast_hash": "ef049cf9b3d8333e2d3dd7a961325eb2",
+    "semantic_hash": "ef049cf9b3d8333e2d3dd7a961325eb2"
+  },
+  "/Users/dandi/Sandbox/akb48/adapters/telegram/split.go": {
+    "mtime": 1779489946.8175805,
+    "ast_hash": "46587cb17343f2097475f7521b00e9d6",
+    "semantic_hash": "46587cb17343f2097475f7521b00e9d6"
+  },
+  "/Users/dandi/Sandbox/akb48/adapters/telegram/telegram_test.go": {
+    "mtime": 1779489946.8181653,
+    "ast_hash": "0c6fc23c812c310c7362fe8145360041",
+    "semantic_hash": "0c6fc23c812c310c7362fe8145360041"
+  },
+  "/Users/dandi/Sandbox/akb48/AGENTS.md": {
+    "mtime": 1779023738.369945,
+    "ast_hash": "d7bf17e5d2d1912b9bf294e9c26d1177",
+    "semantic_hash": "d7bf17e5d2d1912b9bf294e9c26d1177"
+  },
+  "/Users/dandi/Sandbox/akb48/CLAUDE.md": {
+    "mtime": 1779024301.6746657,
+    "ast_hash": "21e2d6a0dce4b005bc12259048fe1bd8",
+    "semantic_hash": "21e2d6a0dce4b005bc12259048fe1bd8"
+  },
+  "/Users/dandi/Sandbox/akb48/identity/USER.md": {
+    "mtime": 1779319731.6983721,
+    "ast_hash": "c195cf20fa7befd85983d66c727a4d40",
+    "semantic_hash": "c195cf20fa7befd85983d66c727a4d40"
+  },
+  "/Users/dandi/Sandbox/akb48/identity/SOUL.md": {
+    "mtime": 1779319731.698303,
+    "ast_hash": "4a14fb8c601abad909c447762a79d14b",
+    "semantic_hash": "4a14fb8c601abad909c447762a79d14b"
+  },
+  "/Users/dandi/Sandbox/akb48/identity/AGENTS.md": {
+    "mtime": 1779320426.2501128,
+    "ast_hash": "98ae053c5a5386eaf4bca850615f3af3",
+    "semantic_hash": "98ae053c5a5386eaf4bca850615f3af3"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-rsh/05-akb48-reference-library.md": {
+    "mtime": 1779023738.3758798,
+    "ast_hash": "03c1d08f5fc2f54ce7e12f2eb6fc6f1f",
+    "semantic_hash": "03c1d08f5fc2f54ce7e12f2eb6fc6f1f"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-rsh/03-akb48-build-strategy-risks.md": {
+    "mtime": 1779023738.3749368,
+    "ast_hash": "e9e5e061020b56ed7a81f1740606000c",
+    "semantic_hash": "e9e5e061020b56ed7a81f1740606000c"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-rsh/01-akb48-platform-landscape.md": {
+    "mtime": 1779023738.374288,
+    "ast_hash": "c101e0fe79dd8dcf87f834030f4a6d56",
+    "semantic_hash": "c101e0fe79dd8dcf87f834030f4a6d56"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-rsh/02-akb48-capabilities-memory.md": {
+    "mtime": 1779023738.3746185,
+    "ast_hash": "a4b60ef6f6e31c8d61d5d8292f6a37f7",
+    "semantic_hash": "a4b60ef6f6e31c8d61d5d8292f6a37f7"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-rsh/04-akb48-original-blueprint.md": {
+    "mtime": 1779023738.3755145,
+    "ast_hash": "a7a176c8475628739960cc291dafa469",
+    "semantic_hash": "a7a176c8475628739960cc291dafa469"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/claude-code-project-structure.md": {
+    "mtime": 1779022143.7961833,
+    "ast_hash": "c45bf6efdce051b820dd6627cde98c90",
+    "semantic_hash": "c45bf6efdce051b820dd6627cde98c90"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/context/tech-stack.md": {
+    "mtime": 1779022143.8094165,
+    "ast_hash": "dc89bd066ac44b6ded5edba40eda8238",
+    "semantic_hash": "dc89bd066ac44b6ded5edba40eda8238"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/context/project-overview.md": {
+    "mtime": 1779022143.8107004,
+    "ast_hash": "83198d449d6cd18a8368e319036f6cdc",
+    "semantic_hash": "83198d449d6cd18a8368e319036f6cdc"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/workflows/deployment-pipeline.md": {
+    "mtime": 1779022143.8124104,
+    "ast_hash": "84fcd4e2d34f434cb6f98cb3d4837e12",
+    "semantic_hash": "84fcd4e2d34f434cb6f98cb3d4837e12"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/workflows/bug-triage-fix.md": {
+    "mtime": 1779022143.8139458,
+    "ast_hash": "971ff16b0b9cf422421059147425e608",
+    "semantic_hash": "971ff16b0b9cf422421059147425e608"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/workflows/idea-to-production.md": {
+    "mtime": 1779022143.8153381,
+    "ast_hash": "82dac00e72963dcaa23756731b7ad68b",
+    "semantic_hash": "82dac00e72963dcaa23756731b7ad68b"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/workflows/feature-development.md": {
+    "mtime": 1779022143.8167071,
+    "ast_hash": "d7d003ad871276bc8a928a9feed6b1f2",
+    "semantic_hash": "d7d003ad871276bc8a928a9feed6b1f2"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/routing.md": {
+    "mtime": 1779026123.6331053,
+    "ast_hash": "25a832e567da03e9539fc960a9c83ec6",
+    "semantic_hash": "25a832e567da03e9539fc960a9c83ec6"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/code-reviewer.md": {
+    "mtime": 1779026123.63649,
+    "ast_hash": "54529224568770733d9cd48d478efe97",
+    "semantic_hash": "54529224568770733d9cd48d478efe97"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/orchestrator.md": {
+    "mtime": 1779026123.6392963,
+    "ast_hash": "d81d48aef8cdb38a65a8d7f367d48510",
+    "semantic_hash": "d81d48aef8cdb38a65a8d7f367d48510"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/frontend/ux-resilience.md": {
+    "mtime": 1779026123.6421235,
+    "ast_hash": "b30bc12f77cf5e2f3cd9d83dddcd9e0a",
+    "semantic_hash": "b30bc12f77cf5e2f3cd9d83dddcd9e0a"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/frontend/state-management.md": {
+    "mtime": 1779026123.6449368,
+    "ast_hash": "a8263fc4ccd8ab168896bff82d5f4210",
+    "semantic_hash": "a8263fc4ccd8ab168896bff82d5f4210"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/frontend/realtime.md": {
+    "mtime": 1779026123.648112,
+    "ast_hash": "d3a80ae2a7231aa1ae5345c9d4a749d7",
+    "semantic_hash": "d3a80ae2a7231aa1ae5345c9d4a749d7"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/frontend/data-fetching.md": {
+    "mtime": 1779026123.6513057,
+    "ast_hash": "2f1a59952541013ce4f737f843b8f278",
+    "semantic_hash": "2f1a59952541013ce4f737f843b8f278"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/frontend/frontend-architect.md": {
+    "mtime": 1779026123.654409,
+    "ast_hash": "dff55cd790ffcce9ef13c9a51c0e7085",
+    "semantic_hash": "dff55cd790ffcce9ef13c9a51c0e7085"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/backend/go-architect.md": {
+    "mtime": 1779026123.657747,
+    "ast_hash": "2c28f9a1f9e09a6680b0d136baf8445c",
+    "semantic_hash": "2c28f9a1f9e09a6680b0d136baf8445c"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/backend/production-readiness.md": {
+    "mtime": 1779026123.66067,
+    "ast_hash": "d1f11300e0c366f7522c57fded1d8baf",
+    "semantic_hash": "d1f11300e0c366f7522c57fded1d8baf"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/backend/fault-tolerance.md": {
+    "mtime": 1779026123.663422,
+    "ast_hash": "dad68623bafaee26603f1915679e6297",
+    "semantic_hash": "dad68623bafaee26603f1915679e6297"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/backend/observability.md": {
+    "mtime": 1779026123.6665232,
+    "ast_hash": "2a96b0f902516ee5bfcc368e00319ea5",
+    "semantic_hash": "2a96b0f902516ee5bfcc368e00319ea5"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/backend/concurrency.md": {
+    "mtime": 1779026123.6694438,
+    "ast_hash": "1949eec934302ef62450633b3b65e1cb",
+    "semantic_hash": "1949eec934302ef62450633b3b65e1cb"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/product/product-manager.md": {
+    "mtime": 1779026123.6722631,
+    "ast_hash": "c1513173b3c4b3413f18ebc121c384ca",
+    "semantic_hash": "c1513173b3c4b3413f18ebc121c384ca"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/product/product-research.md": {
+    "mtime": 1779026123.6748996,
+    "ast_hash": "319fdaf8a6910671997ff471d856bccd",
+    "semantic_hash": "319fdaf8a6910671997ff471d856bccd"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/product/tech-lead-architect.md": {
+    "mtime": 1779026123.6775198,
+    "ast_hash": "0da228829a3a19d3f99f9c6cbe3ba5ab",
+    "semantic_hash": "0da228829a3a19d3f99f9c6cbe3ba5ab"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/testing/tooling.md": {
+    "mtime": 1779026123.680626,
+    "ast_hash": "4ecc60655a5254e69feaa59899c938cb",
+    "semantic_hash": "4ecc60655a5254e69feaa59899c938cb"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/testing/ci-testing.md": {
+    "mtime": 1779026123.6838503,
+    "ast_hash": "9357c4d3629dd996abe3552e2db69e8d",
+    "semantic_hash": "9357c4d3629dd996abe3552e2db69e8d"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/testing/performance-chaos.md": {
+    "mtime": 1779026123.686931,
+    "ast_hash": "9b0e6ff83bd67b2b5170b445d7e30a92",
+    "semantic_hash": "9b0e6ff83bd67b2b5170b445d7e30a92"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/testing/test-environment.md": {
+    "mtime": 1779026123.6899526,
+    "ast_hash": "a5ffe676675a470a95dbe13b63345c67",
+    "semantic_hash": "a5ffe676675a470a95dbe13b63345c67"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/testing/testing-strategy.md": {
+    "mtime": 1779026123.6930065,
+    "ast_hash": "c9244279923750cc1406f251cf5dbb69",
+    "semantic_hash": "c9244279923750cc1406f251cf5dbb69"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/infrastructure/kubernetes-architect.md": {
+    "mtime": 1779026123.6957822,
+    "ast_hash": "7fdbc5fb9ec4e0d152418ce2d4921976",
+    "semantic_hash": "7fdbc5fb9ec4e0d152418ce2d4921976"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/infrastructure/terraform-architect.md": {
+    "mtime": 1779026123.698835,
+    "ast_hash": "daaf62c1ce70e6803e7ca1a4016546e9",
+    "semantic_hash": "daaf62c1ce70e6803e7ca1a4016546e9"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/infrastructure/networking.md": {
+    "mtime": 1779026123.701813,
+    "ast_hash": "c56e517bd331163ca693b577315b0645",
+    "semantic_hash": "c56e517bd331163ca693b577315b0645"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/infrastructure/cicd.md": {
+    "mtime": 1779026123.7047045,
+    "ast_hash": "5c02852cdb8ba6e8b765ad9fe03bde4f",
+    "semantic_hash": "5c02852cdb8ba6e8b765ad9fe03bde4f"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/infrastructure/observability-infra.md": {
+    "mtime": 1779026123.7076383,
+    "ast_hash": "f6a63e3612ca25733b4f2326005114c4",
+    "semantic_hash": "f6a63e3612ca25733b4f2326005114c4"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/infrastructure/gitops.md": {
+    "mtime": 1779026123.7103074,
+    "ast_hash": "62ae5b14183968d7e46fa47ca8cfb4c9",
+    "semantic_hash": "62ae5b14183968d7e46fa47ca8cfb4c9"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/agents/infrastructure/security.md": {
+    "mtime": 1779026123.71294,
+    "ast_hash": "36186a84734e0e4b353a0c21c7759901",
+    "semantic_hash": "36186a84734e0e4b353a0c21c7759901"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/templates/prd-template.md": {
+    "mtime": 1779022143.819394,
+    "ast_hash": "57d882481ebf0d1e7059d5414bac00d9",
+    "semantic_hash": "57d882481ebf0d1e7059d5414bac00d9"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/templates/trd-template.md": {
+    "mtime": 1779022143.8207154,
+    "ast_hash": "b374dd15b5b21d429072f976d0c84848",
+    "semantic_hash": "b374dd15b5b21d429072f976d0c84848"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/templates/test-plan-template.md": {
+    "mtime": 1779022143.821948,
+    "ast_hash": "87cf469a391801281287747152eef279",
+    "semantic_hash": "87cf469a391801281287747152eef279"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/templates/architecture-decision-record.md": {
+    "mtime": 1779022143.8232086,
+    "ast_hash": "8efb462daeda417652740f5a31d22b64",
+    "semantic_hash": "8efb462daeda417652740f5a31d22b64"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/commands/setup_infra.md": {
+    "mtime": 1779022143.8247736,
+    "ast_hash": "8951f4de552f9061afb2d5b4cd43dbc9",
+    "semantic_hash": "8951f4de552f9061afb2d5b4cd43dbc9"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/commands/analyze_codebase.md": {
+    "mtime": 1779022143.8263655,
+    "ast_hash": "66387a55f98c3512fcb2f21268da2fd4",
+    "semantic_hash": "66387a55f98c3512fcb2f21268da2fd4"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/commands/design_architecture.md": {
+    "mtime": 1779022143.8275871,
+    "ast_hash": "6ee58565b0a6b2bc2336de226729833d",
+    "semantic_hash": "6ee58565b0a6b2bc2336de226729833d"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/commands/plan_feature.md": {
+    "mtime": 1779022143.8287668,
+    "ast_hash": "9c9295bd4233e9955be54d126b60a95d",
+    "semantic_hash": "9c9295bd4233e9955be54d126b60a95d"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/commands/review_code.md": {
+    "mtime": 1779022143.8302035,
+    "ast_hash": "1688c1be67390b0e59f355e6a50e0fa2",
+    "semantic_hash": "1688c1be67390b0e59f355e6a50e0fa2"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/commands/run_tests.md": {
+    "mtime": 1779022143.832484,
+    "ast_hash": "5dfbd3f6cab90b5426f1244e04a87bfd",
+    "semantic_hash": "5dfbd3f6cab90b5426f1244e04a87bfd"
+  },
+  "/Users/dandi/Sandbox/akb48/.claude/commands/generate_prd.md": {
+    "mtime": 1779022143.8342268,
+    "ast_hash": "c34105f26e166909ff9f3b2f1dd3d577",
+    "semantic_hash": "c34105f26e166909ff9f3b2f1dd3d577"
+  },
+  "/Users/dandi/Sandbox/akb48/docs/superpowers/plans/2026-05-01-akb48-foundation.md": {
+    "mtime": 1779023738.376662,
+    "ast_hash": "5cd5a4312f8b5b15a648e2df33363ab8",
+    "semantic_hash": "5cd5a4312f8b5b15a648e2df33363ab8"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-dev-plan/phase-4-telegram-adapter.md": {
+    "mtime": 1779023738.369181,
+    "ast_hash": "63527d98c0d3cbd9ee0d60dc94c55616",
+    "semantic_hash": "63527d98c0d3cbd9ee0d60dc94c55616"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-dev-plan/phase-1-session-runtime.md": {
+    "mtime": 1779023738.3684227,
+    "ast_hash": "7083d85b77313f21708a726082d5828c",
+    "semantic_hash": "7083d85b77313f21708a726082d5828c"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-dev-plan/phase-3-gbrain-integration.md": {
+    "mtime": 1779023738.368868,
+    "ast_hash": "183c1f7e7cd1c12d95842c3973b169a4",
+    "semantic_hash": "183c1f7e7cd1c12d95842c3973b169a4"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-dev-plan/phase-2-identity-skills.md": {
+    "mtime": 1779023738.368642,
+    "ast_hash": "9dab38cd33afbde2397a446f7480c9fb",
+    "semantic_hash": "9dab38cd33afbde2397a446f7480c9fb"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-dev-plan/README.md": {
+    "mtime": 1779023738.368199,
+    "ast_hash": "131ce5de10a01ab26e4a70785f3e899d",
+    "semantic_hash": "131ce5de10a01ab26e4a70785f3e899d"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-dev-plan/phase-5-hello-world.md": {
+    "mtime": 1779023738.3696353,
+    "ast_hash": "4dff15dfcd634bc1b0177cdb62d1deaa",
+    "semantic_hash": "4dff15dfcd634bc1b0177cdb62d1deaa"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-prd/2026-05-01-memory-management-design.md": {
+    "mtime": 1779023738.3715622,
+    "ast_hash": "b9dd400781f0d53c4e02fafd5beabc1e",
+    "semantic_hash": "b9dd400781f0d53c4e02fafd5beabc1e"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-prd/PRD-05-session-management.md": {
+    "mtime": 1779023738.373962,
+    "ast_hash": "78bc3fb0e32ece0721709c7c2a5fe6bd",
+    "semantic_hash": "78bc3fb0e32ece0721709c7c2a5fe6bd"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-prd/PRD-04-identity-skills.md": {
+    "mtime": 1779023738.373587,
+    "ast_hash": "126a89c8929cdfe090b5dafae9cdd704",
+    "semantic_hash": "126a89c8929cdfe090b5dafae9cdd704"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-prd/PRD-03-gbrain-integration.md": {
+    "mtime": 1779023738.3732755,
+    "ast_hash": "03fb14e20602d5342cb65e4a71831b46",
+    "semantic_hash": "03fb14e20602d5342cb65e4a71831b46"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-prd/PRD-02-channel-adapters.md": {
+    "mtime": 1779023738.3729985,
+    "ast_hash": "3ab2eb6b8f5603f55c16b5d664ec1453",
+    "semantic_hash": "3ab2eb6b8f5603f55c16b5d664ec1453"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-prd/PRD-01-core-runtime.md": {
+    "mtime": 1779023738.3727114,
+    "ast_hash": "5b6b1cf81bb0e764acfbde415b5d0dc0",
+    "semantic_hash": "5b6b1cf81bb0e764acfbde415b5d0dc0"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-prd/2026-05-03-architect-review-agentic-platform.md": {
+    "mtime": 1779023738.3721373,
+    "ast_hash": "31f438c9f8a93acb9afcd4315f00285e",
+    "semantic_hash": "31f438c9f8a93acb9afcd4315f00285e"
+  },
+  "/Users/dandi/Sandbox/akb48/akb48-prd/PRD-00-akb48-master.md": {
+    "mtime": 1779023738.372429,
+    "ast_hash": "2864791e63a8b8abbe3252f992482b21",
+    "semantic_hash": "2864791e63a8b8abbe3252f992482b21"
+  },
+  "/Users/dandi/Sandbox/akb48/skills/research/SKILL.md": {
+    "mtime": 1779319731.698531,
+    "ast_hash": "a241612c8626be7039ccbd0a3bb18334",
+    "semantic_hash": "a241612c8626be7039ccbd0a3bb18334"
+  },
+  "/Users/dandi/Sandbox/akb48/skills/note-capture/SKILL.md": {
+    "mtime": 1779319731.698457,
+    "ast_hash": "161d4d7417de622fcc914df6bcb048db",
+    "semantic_hash": "161d4d7417de622fcc914df6bcb048db"
+  }
+}
