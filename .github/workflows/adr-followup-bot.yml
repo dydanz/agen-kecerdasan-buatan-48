@@ -44,11 +44,36 @@ jobs:
 
             console.log(`Found ${adrPending.length} PR(s) with adr-required past 48h.`);
 
+            const adrPattern = /ADR[-\s]*\d+|akb48-adr\//i;
+
             for (const pr of adrPending) {
               const prBody = pr.body || '';
               const prNumber = pr.number;
 
-              const hasAdr = /ADR[-\s]*\d+|akb48-adr\//i.test(prBody);
+              // Check PR body first
+              let hasAdr = adrPattern.test(prBody);
+
+              // Also check linked issues — ADR may be referenced there instead
+              if (!hasAdr) {
+                const issueMatches = [...prBody.matchAll(/(?:Closes|Fixes|Resolves)\s+#(\d+)/gi)];
+                const issueNumbers = issueMatches.map(m => parseInt(m[1]));
+                for (const issueNum of issueNumbers) {
+                  try {
+                    const issue = await github.rest.issues.get({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issueNum,
+                    });
+                    if (adrPattern.test(issue.data.body || '')) {
+                      hasAdr = true;
+                      break;
+                    }
+                  } catch (e) {
+                    console.log(`Could not fetch issue #${issueNum}: ${e.message}`);
+                  }
+                }
+              }
+
               if (hasAdr) {
                 console.log(`PR #${prNumber}: ADR link found — no follow-up needed.`);
                 continue;

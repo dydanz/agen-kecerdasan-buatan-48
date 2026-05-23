@@ -52,7 +52,8 @@ jobs:
 
               let specFound = false;
 
-              if (prBody.includes('## Post-merge spec') || (prBody.includes('## What broke') && prBody.length > 400)) {
+              // Only an explicit post-merge spec section counts — not the intake template header
+              if (prBody.includes('## Post-merge spec')) {
                 specFound = true;
               }
 

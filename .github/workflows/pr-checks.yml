@@ -44,6 +44,7 @@ jobs:
               { pattern: /## Risk/,                                       label: 'Risk section' },
               { pattern: /## Rollback/,                                   label: 'Rollback section' },
               { pattern: /Closes #\d+|Fixes #\d+|Resolves #\d+/i,        label: 'Linked issue (Closes #N)' },
+              { pattern: /KLW:/,                                          label: 'KLW ticket reference' },
             ];
             const missing = checks.filter(c => !c.pattern.test(body)).map(c => c.label);
             if (missing.length > 0) {
