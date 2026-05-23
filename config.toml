@@ -10,7 +10,7 @@ max_tool_result_tokens = 500
 enabled = true
 
 [adapters.discord]
-enabled = false
+enabled = true
 token_env = "DISCORD_BOT_TOKEN"
 allowed_user_ids = []          # Add your Discord snowflake user ID (string)
 streaming_interval_ms = 1000

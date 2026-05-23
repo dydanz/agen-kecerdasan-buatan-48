@@ -113,6 +113,14 @@ func (a *Adapter) onInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 	}
 
 	if !a.isAllowed(userID) {
+		// Must ACK — returning without responding causes Discord to show "interaction failed".
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Not authorized.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
 		return
 	}
 
@@ -186,6 +194,11 @@ func (a *Adapter) processInteraction(s *discordgo.Session, i *discordgo.Interact
 	ctx := context.Background()
 	if err := a.handler(ctx, msg, tokens); err != nil {
 		slog.Error("Discord interaction handler error", "error", err)
+		close(tokens)
+		wg.Wait()
+		errMsg := fmt.Sprintf("Error: %v", err)
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{Content: &errMsg})
+		return
 	}
 	close(tokens)
 	wg.Wait()
