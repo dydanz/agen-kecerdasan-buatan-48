@@ -93,24 +93,28 @@ jobs:
 
               const mergedBy = pr.merged_by ? pr.merged_by.login : 'unknown';
 
+              const body = [
+                '## ADR Required',
+                '',
+                `PR #${prNumber} (\`${pr.head.ref}\`) was merged at ${pr.merged_at} with the \`adr-required\` label but no ADR has been linked after 48 hours.`,
+                '',
+                '**Action required:**',
+                '',
+                'Draft an ADR for the architectural decision made in this PR. Add it to `akb48-adr/` using the template at `akb48-adr/0000-template.md`. Then reference it in the original PR description or linked issue.',
+                '',
+                `**Original PR:** #${prNumber}`,
+                `**Merged by:** @${mergedBy}`,
+                `**Merged at:** ${pr.merged_at}`,
+                '',
+                '---',
+                'Auto-created by ADR follow-up bot. Close once the ADR is committed and linked.',
+              ].join('\n');
+
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: `[adr-followup] ADR missing for PR #${prNumber}`,
-                body: `## ADR Required
-
-PR #${prNumber} (\`${pr.head.ref}\`) was merged at ${pr.merged_at} with the \`adr-required\` label but no ADR has been linked after 48 hours.
-
-**Action required:**
-
-Draft an ADR for the architectural decision made in this PR. Add it to \`akb48-adr/\` using the template at \`akb48-adr/0000-template.md\`. Then reference it in the original PR description or linked issue.
-
-**Original PR:** #${prNumber}
-**Merged by:** @${mergedBy}
-**Merged at:** ${pr.merged_at}
-
----
-Auto-created by ADR follow-up bot. Close once the ADR is committed and linked.`,
+                body,
                 labels: ['adr-required'],
                 assignees: mergedBy !== 'unknown' ? [mergedBy] : [],
               });
