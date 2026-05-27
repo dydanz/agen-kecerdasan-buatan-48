@@ -8,11 +8,21 @@
 
 ## What Is AKB48
 
-**AKB48** stands for **Agen Kecerdasan Buatan 48** — Indonesian for "48 Artificial Intelligence Agents."
+**AKB48** stands for **Agen Kecerdasan Buatan 48**. Just for fun, lol.
 
 This is a learning project built from the perspective of an **Engineering Manager** exploring a core question:
 
-> *Can we automate the tedious parts of SDLC — ticket creation, spec drafting, PR description gates, ADR follow-through, hotfix enforcement — using AI agents and GitHub's own project management tooling?*
+Beyond Tooling: AI-First as Institutional Memory
+The goal is not to make engineers faster in isolation. It is to make Electrum — as my current company — smarter over time. Every decision made in a standup, every architectural trade-off debated in a PR, every incident post-mortem, every customer insight surfaced in the field: these are assets. Today, they live in people's heads, in Lark threads, in documents nobody re-reads. 
+An AI-first organisation systematically captures, structures, and routes this knowledge so that it compounds — so that the company gets measurably smarter every quarter, independent of headcount.
+
+This means AI-first is not an engineering initiative. It is a business development initiative. Data-driven decision-making requires data that is clean, structured, and accessible. AI-augmented operations require context that is retained across teams, roles, and time. The engineering transformation is the foundation — but the payoff is a business that learns faster than its competitors, retains institutional knowledge even as teams change, and can make higher-quality decisions with less coordination overhead.
+
+Concretely, this means:
+
+Retaining knowledge, not just output. Every agent session, ADR, hotfix root cause, and architecture decision is a structured artifact — not a Slack message that disappears.
+Cross-functional AI fluency. Product, operations, and finance teams adopt the same knowledge infrastructure. The engineering knowledge graph is not a dev tool — it is a company asset.
+Compounding returns. An AI-first culture produces diminishing friction over time: the more context the system retains, the less time is spent re-explaining, re-deciding, and re-discovering.*
 
 The goal is not just to ship a working AI runtime, but to prove that **GitHub Issues, PR templates, and Actions workflows** can carry the accountability and transparency that a software development team normally depends on humans to maintain. Every feature in this repo was tracked as a GitHub Issue before a line of code was written, reviewed as a PR before merge, and linked to a KLW ticket and PRD. The agent helps write the specs and the code — but the paper trail lives in GitHub, visible to any future collaborator.
 
