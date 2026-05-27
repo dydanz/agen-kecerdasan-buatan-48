@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/dydanz/akb48/adapters/shared"
 	"github.com/dydanz/akb48/internal/config"
 )
@@ -38,6 +39,74 @@ func TestSessionIDFormat(t *testing.T) {
 	got := fmt.Sprintf("main:discord:%s", userID)
 	if got != want {
 		t.Errorf("session ID format wrong: got %q want %q", got, want)
+	}
+}
+
+func newTestAdapter(botID string) *Adapter {
+	s, _ := discordgo.New("Bot fake-token")
+	s.State.User = &discordgo.User{ID: botID}
+	return &Adapter{session: s, cfg: config.DiscordConfig{}}
+}
+
+func TestIsMentioned(t *testing.T) {
+	botID := "111000111000111000"
+	a := newTestAdapter(botID)
+
+	mentioned := &discordgo.MessageCreate{
+		Message: &discordgo.Message{
+			Mentions: []*discordgo.User{{ID: botID}},
+		},
+	}
+	if !a.isMentioned(mentioned) {
+		t.Error("expected isMentioned=true when bot ID in Mentions")
+	}
+
+	notMentioned := &discordgo.MessageCreate{
+		Message: &discordgo.Message{
+			Mentions: []*discordgo.User{{ID: "999999999999999999"}},
+		},
+	}
+	if a.isMentioned(notMentioned) {
+		t.Error("expected isMentioned=false when bot ID not in Mentions")
+	}
+
+	empty := &discordgo.MessageCreate{
+		Message: &discordgo.Message{Mentions: nil},
+	}
+	if a.isMentioned(empty) {
+		t.Error("expected isMentioned=false on empty Mentions")
+	}
+}
+
+func TestIsMentioned_NilMentions(t *testing.T) {
+	a := newTestAdapter("111")
+	m := &discordgo.MessageCreate{Message: &discordgo.Message{}}
+	if a.isMentioned(m) {
+		t.Error("nil Mentions should not be considered a mention")
+	}
+}
+
+func TestStripMention(t *testing.T) {
+	botID := "111000111000111000"
+	a := newTestAdapter(botID)
+
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{fmt.Sprintf("<@%s> explain goroutine leaks", botID), "explain goroutine leaks"},
+		{fmt.Sprintf("<@!%s> explain goroutine leaks", botID), "explain goroutine leaks"},
+		{fmt.Sprintf("hey <@%s> what time is it?", botID), "hey  what time is it?"},
+		{fmt.Sprintf("<@%s>", botID), ""},
+		{fmt.Sprintf("  <@%s>  ", botID), ""},
+		{"no mention here", "no mention here"},
+	}
+
+	for _, c := range cases {
+		got := a.stripMention(c.input)
+		if got != c.want {
+			t.Errorf("stripMention(%q) = %q, want %q", c.input, got, c.want)
+		}
 	}
 }
 

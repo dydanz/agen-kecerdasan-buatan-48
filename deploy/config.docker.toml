@@ -21,6 +21,7 @@ allowed_user_ids = ["691898565261393948", "1486543684374757416"]
 streaming_interval_ms = 1000
 slash_commands = true
 slash_command_guild_id = ""
+mention_response = true       # set true to respond to @mentions in server channels
 
 [adapters.telegram]
 enabled = false

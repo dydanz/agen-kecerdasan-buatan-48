@@ -77,20 +77,65 @@ func (a *Adapter) Start(ctx context.Context) error {
 	return a.session.Close()
 }
 
-// onMessage handles incoming DMs from allowed users.
+// onMessage routes DMs to the existing path and guild-channel @mentions (opt-in) to
+// the threaded reply path.
 func (a *Adapter) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author == nil || m.Author.Bot {
 		return
 	}
-	if !a.isAllowed(m.Author.ID) {
-		slog.Debug("Discord: message from non-allowed user dropped", "user_id", m.Author.ID)
-		return
+
+	ch, err := s.State.Channel(m.ChannelID)
+	if err != nil {
+		ch, err = s.Channel(m.ChannelID)
+		if err != nil {
+			slog.Warn("Discord: could not fetch channel", "channel_id", m.ChannelID, "error", err)
+			return
+		}
 	}
-	ch, err := s.Channel(m.ChannelID)
-	if err != nil || ch.Type != discordgo.ChannelTypeDM {
-		return
+
+	switch ch.Type {
+	case discordgo.ChannelTypeDM:
+		if !a.isAllowed(m.Author.ID) {
+			slog.Debug("Discord: DM from non-allowed user dropped", "user_id", m.Author.ID)
+			return
+		}
+		go a.process(m.ChannelID, m.Author.ID, m.Content, nil)
+
+	case discordgo.ChannelTypeGuildText, discordgo.ChannelTypeGuildNews:
+		if !a.cfg.MentionResponse {
+			return
+		}
+		if !a.isMentioned(m) {
+			return
+		}
+		if !a.isAllowed(m.Author.ID) {
+			return
+		}
+		text := a.stripMention(m.Content)
+		if text == "" {
+			return
+		}
+		go a.process(m.ChannelID, m.Author.ID, text, m.Reference())
 	}
-	go a.process(m.ChannelID, m.Author.ID, m.Content)
+}
+
+// isMentioned reports whether the bot's own user ID appears in m.Mentions.
+func (a *Adapter) isMentioned(m *discordgo.MessageCreate) bool {
+	botID := a.session.State.User.ID
+	for _, u := range m.Mentions {
+		if u.ID == botID {
+			return true
+		}
+	}
+	return false
+}
+
+// stripMention removes <@BOT_ID> and <@!BOT_ID> from text and trims whitespace.
+func (a *Adapter) stripMention(text string) string {
+	botID := a.session.State.User.ID
+	text = strings.ReplaceAll(text, "<@"+botID+">", "")
+	text = strings.ReplaceAll(text, "<@!"+botID+">", "")
+	return strings.TrimSpace(text)
 }
 
 // onInteraction handles /ask slash commands.
@@ -141,7 +186,7 @@ func (a *Adapter) onInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 	go a.processInteraction(s, i, userID, query)
 }
 
-func (a *Adapter) process(channelID, userID, text string) {
+func (a *Adapter) process(channelID, userID, text string, ref *discordgo.MessageReference) {
 	a.session.ChannelTyping(channelID)
 
 	msg := types.Message{
@@ -156,7 +201,7 @@ func (a *Adapter) process(channelID, userID, text string) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := a.sendStreaming(channelID, tokens); err != nil {
+		if err := a.sendStreaming(channelID, tokens, ref); err != nil {
 			slog.Error("Discord streaming error", "error", err)
 		}
 	}()
@@ -204,11 +249,19 @@ func (a *Adapter) processInteraction(s *discordgo.Session, i *discordgo.Interact
 	wg.Wait()
 }
 
-// sendStreaming sends tokens as progressive edits to a placeholder DM message.
-func (a *Adapter) sendStreaming(channelID string, tokens <-chan string) error {
+// sendStreaming sends tokens as progressive edits to a placeholder message.
+// ref is non-nil for guild @mention replies — uses ChannelMessageSendReply for threading.
+func (a *Adapter) sendStreaming(channelID string, tokens <-chan string, ref *discordgo.MessageReference) error {
 	interval := time.Duration(a.cfg.StreamingIntervalMs) * time.Millisecond
 
-	placeholder, err := a.session.ChannelMessageSend(channelID, cursor)
+	sendPlaceholder := func() (*discordgo.Message, error) {
+		if ref != nil {
+			return a.session.ChannelMessageSendReply(channelID, cursor, ref)
+		}
+		return a.session.ChannelMessageSend(channelID, cursor)
+	}
+
+	placeholder, err := sendPlaceholder()
 	if err != nil {
 		return fmt.Errorf("send placeholder: %w", err)
 	}
@@ -222,15 +275,15 @@ func (a *Adapter) sendStreaming(channelID string, tokens <-chan string) error {
 		select {
 		case token, ok := <-tokens:
 			if !ok {
-				return a.editFinal(channelID, msgID, buf.String())
+				return a.editFinal(channelID, msgID, buf.String(), ref)
 			}
 			buf.WriteString(token)
 
 			if buf.Len() > overflowAt {
-				if err := a.editFinal(channelID, msgID, buf.String()); err != nil {
+				if err := a.editFinal(channelID, msgID, buf.String(), ref); err != nil {
 					slog.Warn("Discord: overflow finalize error", "error", err)
 				}
-				newMsg, err := a.session.ChannelMessageSend(channelID, cursor)
+				newMsg, err := sendPlaceholder()
 				if err != nil {
 					return fmt.Errorf("send overflow placeholder: %w", err)
 				}
@@ -289,7 +342,7 @@ func (a *Adapter) sendStreamingInteraction(s *discordgo.Session, i *discordgo.In
 	}
 }
 
-func (a *Adapter) editFinal(channelID, msgID, text string) error {
+func (a *Adapter) editFinal(channelID, msgID, text string, ref *discordgo.MessageReference) error {
 	if text == "" {
 		text = "(empty response)"
 	}
@@ -298,8 +351,14 @@ func (a *Adapter) editFinal(channelID, msgID, text string) error {
 		slog.Warn("Discord: final edit failed", "error", err)
 	}
 	for _, part := range parts[1:] {
-		if _, err := a.session.ChannelMessageSend(channelID, part); err != nil {
-			slog.Warn("Discord: overflow part send failed", "error", err)
+		if ref != nil {
+			if _, err := a.session.ChannelMessageSendReply(channelID, part, ref); err != nil {
+				slog.Warn("Discord: overflow reply send failed", "error", err)
+			}
+		} else {
+			if _, err := a.session.ChannelMessageSend(channelID, part); err != nil {
+				slog.Warn("Discord: overflow part send failed", "error", err)
+			}
 		}
 	}
 	return nil
