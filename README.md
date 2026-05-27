@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/dydanz/agen-kecerdasan-buatan-48/actions/workflows/ci.yml/badge.svg)](https://github.com/dydanz/agen-kecerdasan-buatan-48/actions/workflows/ci.yml)
 [![Go 1.25](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev/doc/go1.25)
-[![Phase](https://img.shields.io/badge/milestone-phase%206%20%E2%80%94%20Discord-5865F2)](https://github.com/dydanz/agen-kecerdasan-buatan-48/milestone/1)
+[![Phase](https://img.shields.io/badge/milestone-phase%207%20%E2%80%94%20%40mention-5865F2)](https://github.com/dydanz/agen-kecerdasan-buatan-48/milestone/1)
 
 ---
 
@@ -27,6 +27,14 @@ Compounding returns. An AI-first culture produces diminishing friction over time
 The goal is not just to ship a working AI runtime, but to prove that **GitHub Issues, PR templates, and Actions workflows** can carry the accountability and transparency that a software development team normally depends on humans to maintain. Every feature in this repo was tracked as a GitHub Issue before a line of code was written, reviewed as a PR before merge, and linked to a KLW ticket and PRD. The agent helps write the specs and the code — but the paper trail lives in GitHub, visible to any future collaborator.
 
 **Philosophy:** "thin harness, fat skills" — the Go runtime is ~2,500 lines; the intelligence lives in skill files, not in the code.
+
+---
+
+## In Action
+
+Kabayan responding to an `@mention` in a Discord server channel — threaded reply, streaming tokens:
+
+![Kabayan responding to @mention in Discord](assets/hello-kabayan.png)
 
 ---
 
@@ -81,6 +89,8 @@ make docker-logs
 
 DM the bot or use `/ask <message>` in any server channel (ephemeral — only you see the reply).
 
+To enable `@mention` response in server channels, set `mention_response = true` under `[adapters.discord]` — bot replies threaded to the original mention.
+
 ---
 
 ## Enable Telegram (fallback)
@@ -125,7 +135,7 @@ Hot-reloads on next message.
 cmd/akb48/           Entry point + graceful shutdown
 adapters/
   cli/               stdin/stdout
-  discord/           Gateway WebSocket, DMs, /ask slash commands, streaming
+  discord/           Gateway WebSocket, DMs, /ask slash commands, @mention, streaming
   telegram/          Long-polling + edit-message streaming
   shared/            SplitMessage utility (shared by all adapters)
 internal/
@@ -139,9 +149,10 @@ internal/
   brain/             MCP client, GBrain bridge, degraded mode
 identity/            AGENTS.md, SOUL.md, USER.md
 skills/              note-capture/SKILL.md, research/SKILL.md
+assets/              Screenshots and media
 deploy/              docker-compose.yml, config.docker.toml, systemd unit
 .github/workflows/   CI, PR Checks, hotfix-followup-bot, adr-followup-bot
-akb48-prd/           Product Requirements Documents (PRD-00 through PRD-06)
+akb48-prd/           Product Requirements Documents (PRD-00 through PRD-08)
 akb48-dev-plan/      Per-phase implementation plans
 akb48-adr/           Architecture Decision Records
 tests/integration/   End-to-end hermetic tests
@@ -176,8 +187,10 @@ Tickets follow the **KLW-XXX** convention. Every feature shipped in this repo ha
 | 4 | Telegram Adapter | KLW-018–019 | ✅ Done |
 | 5 | Hello World Validation | KLW-020–021 | ✅ Done |
 | 6 | Discord Adapter + Docker | KLW-022–027 | ✅ Done |
+| 7 | Discord @mention in server channels | KLW-028–030 | ✅ Done |
+| 8 | Claude CLI backend (subprocess LLM) | KLW-031–034 | 🔄 In progress |
 
-**Total:** ~2,500 lines of Go · 27 tickets · 7 phases
+**Total:** ~2,500 lines of Go · 30 tickets · 8 phases
 
 ---
 
