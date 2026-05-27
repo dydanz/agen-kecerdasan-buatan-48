@@ -35,6 +35,7 @@ type DiscordConfig struct {
 	StreamingIntervalMs int      `toml:"streaming_interval_ms"`
 	SlashCommands       bool     `toml:"slash_commands"`
 	SlashCommandGuildID string   `toml:"slash_command_guild_id"`
+	MentionResponse     bool     `toml:"mention_response"`
 }
 
 type AdaptersConfig struct {
