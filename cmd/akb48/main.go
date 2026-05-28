@@ -15,13 +15,20 @@ import (
 	dcadapter "github.com/dydanz/akb48/adapters/discord"
 	tgadapter "github.com/dydanz/akb48/adapters/telegram"
 	"github.com/dydanz/akb48/internal/config"
+	"github.com/dydanz/akb48/internal/onboard"
 	"github.com/dydanz/akb48/internal/runtime"
 )
 
 func main() {
+	onboardFlag := flag.Bool("onboard", false, "detect CLI auth and print backend config guidance")
 	configPath := flag.String("config", "config.toml", "path to config.toml")
 	validate := flag.Bool("validate", false, "validate config and exit")
 	flag.Parse()
+
+	if *onboardFlag {
+		onboard.Run()
+		os.Exit(0)
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {

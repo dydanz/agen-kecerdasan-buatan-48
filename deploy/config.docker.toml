@@ -3,6 +3,7 @@
 # Keep in sync with root config.toml for non-Docker fields.
 
 [llm]
+backend = "api"   # "api" | "claude-cli"
 model = "claude-sonnet-4-6"
 extraction_model = "claude-haiku-4-5-20251001"
 api_key_env = "ANTHROPIC_API_KEY"

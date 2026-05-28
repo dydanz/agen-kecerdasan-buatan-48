@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
@@ -14,6 +15,7 @@ import (
 	"github.com/dydanz/akb48/internal/config"
 	"github.com/dydanz/akb48/internal/identity"
 	"github.com/dydanz/akb48/internal/llm"
+	"github.com/dydanz/akb48/internal/llm/claudecli"
 	"github.com/dydanz/akb48/internal/session"
 	"github.com/dydanz/akb48/internal/skills"
 	"github.com/dydanz/akb48/internal/tools"
@@ -37,6 +39,7 @@ type ContextAssembler interface {
 type AKB48Runtime struct {
 	cfg            *config.Config
 	llmCaller      llm.CallerInterface
+	cliExec        claudecli.CLIExecutor // nil when backend != "claude-cli" or binary absent
 	registry       *tools.Registry
 	sessionManager *session.SessionManager
 	assembler      ContextAssembler
@@ -79,9 +82,24 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 		slog.Warn("Identity files not loaded — agent will use empty system prompt", "error", err)
 	}
 
+	// Wire CLI executor if backend = "claude-cli" (non-fatal if binary absent).
+	var cliExec claudecli.CLIExecutor
+	if cfg.LLM.Backend == "claude-cli" {
+		var apiKey string
+		if cfg.LLM.APIKeyEnv != "" {
+			apiKey = os.Getenv(cfg.LLM.APIKeyEnv)
+		}
+		var cliErr error
+		cliExec, cliErr = claudecli.New(apiKey)
+		if cliErr != nil {
+			slog.Warn("CLIExecutor unavailable — cli-mode messages will return errors", "error", cliErr)
+		}
+	}
+
 	rt := &AKB48Runtime{
 		cfg:            cfg,
 		llmCaller:      caller,
+		cliExec:        cliExec,
 		registry:       registry,
 		sessionManager: sessionMgr,
 		assembler:      assembler,
@@ -113,21 +131,43 @@ func (r *AKB48Runtime) HandleMessage(ctx context.Context, msg types.Message, tok
 		return fmt.Errorf("resolve session: %w", err)
 	}
 
-	// Cold opener: brain recall context injected for cold sessions.
+	turnID := uuid.NewString()
+	var finalText string
+	var tokenUsage types.TokenUsage
+
+	switch r.cfg.LLM.Backend {
+	case "claude-cli":
+		finalText, err = r.handleCLI(ctx, sess, msg.Text, tokens, turnID)
+	default:
+		finalText, tokenUsage, err = r.handleAPI(ctx, sess, msg.Text, tokens, turnID)
+	}
+	if err != nil {
+		return err
+	}
+
+	turn := session.SessionTurn{
+		TurnID:            turnID,
+		Timestamp:         time.Now().UTC(),
+		UserMessage:       msg.Text,
+		AssistantResponse: finalText,
+		TokenUsage:        tokenUsage,
+		LatencyMs:         time.Since(start).Milliseconds(),
+	}
+	sess.AddTurn(turn)
+	session.RunHooks(r.hooks, sess, turn)
+	return nil
+}
+
+func (r *AKB48Runtime) handleAPI(ctx context.Context, sess *session.Session, text string, tokens chan<- string, turnID string) (string, types.TokenUsage, error) {
 	coldContext := ""
 	if r.coldOpener != nil {
-		coldContext = r.coldOpener.BuildColdContext(ctx, sess, msg.Text)
+		coldContext = r.coldOpener.BuildColdContext(ctx, sess, text)
 	}
-
-	systemPrompt, messages, err := r.assembler.Build(sess, r.sessionManager, msg.Text, coldContext)
+	systemPrompt, messages, err := r.assembler.Build(sess, r.sessionManager, text, coldContext)
 	if err != nil {
-		return fmt.Errorf("build context: %w", err)
+		return "", types.TokenUsage{}, fmt.Errorf("build context: %w", err)
 	}
-
-	messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Text)))
-
-	turnID := uuid.NewString()
-
+	messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(text)))
 	result, err := r.llmCaller.Call(ctx, llm.CallParams{
 		System:   systemPrompt,
 		Messages: messages,
@@ -135,22 +175,48 @@ func (r *AKB48Runtime) HandleMessage(ctx context.Context, msg types.Message, tok
 		TurnID:   turnID,
 	})
 	if err != nil {
-		return fmt.Errorf("llm call: %w", err)
+		return "", types.TokenUsage{}, fmt.Errorf("llm call: %w", err)
+	}
+	return result.Text, result.TokenUsage, nil
+}
+
+func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, text string, tokens chan<- string, turnID string) (string, error) {
+	if r.cliExec == nil {
+		return "", fmt.Errorf("cli backend unavailable (claude binary missing or not authenticated)")
+	}
+	// Get system prompt from assembler; discard messages[] — history goes via --append-system-prompt.
+	systemPrompt, _, err := r.assembler.Build(sess, r.sessionManager, text, "")
+	if err != nil {
+		return "", fmt.Errorf("build system prompt: %w", err)
+	}
+	history := r.sessionManager.GetContextTurns(sess)
+	appendCtx := buildAppendContext(history)
+
+	ch, err := r.cliExec.Execute(ctx, claudecli.CLIRequest{
+		Prompt:             text,
+		SystemPrompt:       systemPrompt,
+		AppendSystemPrompt: appendCtx,
+		Model:              r.cfg.LLM.Model,
+	})
+	if err != nil {
+		return "", fmt.Errorf("cli execute: %w", err)
 	}
 
-	turn := session.SessionTurn{
-		TurnID:            turnID,
-		Timestamp:         time.Now().UTC(),
-		UserMessage:       msg.Text,
-		AssistantResponse: result.Text,
-		TokenUsage:        result.TokenUsage,
-		LatencyMs:         time.Since(start).Milliseconds(),
+	var sb strings.Builder
+	for evt := range ch {
+		switch evt.Type {
+		case "text":
+			sb.WriteString(evt.Content)
+			select {
+			case tokens <- evt.Content:
+			case <-ctx.Done():
+				return sb.String(), ctx.Err()
+			}
+		case "error":
+			return sb.String(), evt.Err
+		}
 	}
-
-	sess.AddTurn(turn)
-	session.RunHooks(r.hooks, sess, turn)
-
-	return nil
+	return sb.String(), nil
 }
 
 // Start loads sessions and prepares the runtime.

@@ -9,6 +9,7 @@ import (
 )
 
 type LLMConfig struct {
+	Backend             string `toml:"backend"`
 	Model               string `toml:"model"`
 	ExtractionModel     string `toml:"extraction_model"`
 	APIKeyEnv           string `toml:"api_key_env"`
@@ -95,6 +96,9 @@ func Load(path string) (*Config, error) {
 }
 
 func (c *Config) applyDefaults() {
+	if c.LLM.Backend == "" {
+		c.LLM.Backend = "api"
+	}
 	if c.LLM.MaxToolRounds == 0 {
 		c.LLM.MaxToolRounds = 5
 	}
@@ -155,11 +159,13 @@ func (c *Config) validate() error {
 	if c.LLM.Model == "" {
 		return fmt.Errorf("llm.model is required")
 	}
-	if c.LLM.APIKeyEnv == "" {
-		return fmt.Errorf("llm.api_key_env is required")
-	}
-	if os.Getenv(c.LLM.APIKeyEnv) == "" {
-		return fmt.Errorf("env var %q (llm.api_key_env) is not set", c.LLM.APIKeyEnv)
+	if c.LLM.Backend != "claude-cli" {
+		if c.LLM.APIKeyEnv == "" {
+			return fmt.Errorf("llm.api_key_env is required")
+		}
+		if os.Getenv(c.LLM.APIKeyEnv) == "" {
+			return fmt.Errorf("env var %q (llm.api_key_env) is not set", c.LLM.APIKeyEnv)
+		}
 	}
 	return nil
 }
