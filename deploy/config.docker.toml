@@ -3,9 +3,11 @@
 # Keep in sync with root config.toml for non-Docker fields.
 
 [llm]
+backend = "claude-cli"   # "api" | "claude-cli"
 model = "claude-sonnet-4-6"
 extraction_model = "claude-haiku-4-5-20251001"
-api_key_env = "ANTHROPIC_API_KEY"
+# claude-cli mode: auth via CLAUDE_CODE_OAUTH_TOKEN env var in .env (no api_key_env needed)
+# api mode: set api_key_env = "ANTHROPIC_API_KEY"
 max_tokens = 4096
 max_tool_rounds = 5
 max_tool_result_tokens = 500

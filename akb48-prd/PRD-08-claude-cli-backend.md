@@ -142,26 +142,33 @@ type CLIExecutor interface {
 ```go
 type executor struct {
     binPath string
-    apiKey  string // ANTHROPIC_API_KEY; injected into subprocess env if non-empty
+    // Auth via CLAUDE_CODE_OAUTH_TOKEN env var or ~/.claude/ credentials.
+    // No API key injection — avoids conflict with ANTHROPIC_API_KEY in parent env.
 }
 
 // New returns CLIExecutor. Returns error if claude binary not in PATH.
 // Callers treat (nil, err) as non-fatal: api-mode continues without CLI.
-func New(apiKey string) (CLIExecutor, error) {
+func New() (CLIExecutor, error) {
     path, err := exec.LookPath("claude")
     if err != nil {
         return nil, fmt.Errorf("claude binary not found in PATH: %w", err)
     }
-    return &executor{binPath: path, apiKey: apiKey}, nil
+    return &executor{binPath: path}, nil
 }
 
 func (e *executor) Execute(ctx context.Context, req CLIRequest) (<-chan CLIEvent, error) {
     args := buildArgs(req)
     cmd := exec.CommandContext(ctx, e.binPath, args...) // #nosec G204
-    cmd.Env = os.Environ()
-    if e.apiKey != "" {
-        cmd.Env = append(cmd.Env, "ANTHROPIC_API_KEY="+e.apiKey)
+    // Strip ANTHROPIC_API_KEY — prevents conflict when CLAUDE_CODE_OAUTH_TOKEN is set.
+    // CLAUDE_CODE_OAUTH_TOKEN is inherited naturally from os.Environ().
+    base := os.Environ()
+    filtered := make([]string, 0, len(base))
+    for _, v := range base {
+        if !strings.HasPrefix(v, "ANTHROPIC_API_KEY=") {
+            filtered = append(filtered, v)
+        }
     }
+    cmd.Env = filtered
     cmd.Dir = os.TempDir() // prevents subprocess reading local CLAUDE.md / hooks
 
     stdout, err := cmd.StdoutPipe()
@@ -379,13 +386,15 @@ func (c *CLILLMClient) Call(ctx context.Context, systemPrompt, userPrompt, model
 var cliExec claudecli.CLIExecutor
 if cfg.LLM.Backend == "claude-cli" {
     var err error
-    cliExec, err = claudecli.New(os.Getenv(cfg.LLM.APIKeyEnv))
+    cliExec, err = claudecli.New()
     if err != nil {
-        log.Warn().Err(err).Msg("CLIExecutor unavailable — cli backend will return errors")
+        slog.Warn("CLIExecutor unavailable — cli-mode messages will return errors", "error", err)
         // cliExec = nil; handled at call site
     }
 }
 ```
+
+Auth is provided by `CLAUDE_CODE_OAUTH_TOKEN` in the environment (set in `.env` for Docker, or via `claude auth login` on Linux). The executor strips `ANTHROPIC_API_KEY` from the subprocess env to prevent conflicts.
 
 In the message handler, switch on backend:
 
@@ -611,7 +620,7 @@ All on branch `feature/klw-031-claude-cli-backend`. PR must close KLW-031. `go t
 - **ToS compliance:** Subprocess only. No OAuth token extraction. `CLAUDE_CODE_OAUTH_TOKEN` is fed as env var into the subprocess — it never touches `anthropic-sdk-go` or the Anthropic API directly.
 - **`cmd.Dir = os.TempDir()`:** Critical. Prevents subprocess from auto-loading project `CLAUDE.md`, hooks, or skill files. Subprocess is fully stateless from Claude's perspective — context comes only from flags.
 - **`#nosec G204`:** `binPath` is resolved via `exec.LookPath("claude")` at startup, not from user input. Operator-controlled, not attacker-controlled.
-- **Subprocess env isolation:** `cmd.Env = os.Environ()` passes the full parent env. `ANTHROPIC_API_KEY` is explicitly appended if available. No secrets are written to disk.
+- **Subprocess env isolation:** `cmd.Env` is built from `os.Environ()` with `ANTHROPIC_API_KEY` stripped. `CLAUDE_CODE_OAUTH_TOKEN` is inherited naturally — never remapped to `ANTHROPIC_API_KEY`. No secrets written to disk.
 
 ---
 
