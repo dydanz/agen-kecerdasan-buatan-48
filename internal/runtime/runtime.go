@@ -85,12 +85,8 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 	// Wire CLI executor if backend = "claude-cli" (non-fatal if binary absent).
 	var cliExec claudecli.CLIExecutor
 	if cfg.LLM.Backend == "claude-cli" {
-		var apiKey string
-		if cfg.LLM.APIKeyEnv != "" {
-			apiKey = os.Getenv(cfg.LLM.APIKeyEnv)
-		}
 		var cliErr error
-		cliExec, cliErr = claudecli.New(apiKey)
+		cliExec, cliErr = claudecli.New()
 		if cliErr != nil {
 			slog.Warn("CLIExecutor unavailable — cli-mode messages will return errors", "error", cliErr)
 		}

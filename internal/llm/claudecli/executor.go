@@ -42,26 +42,33 @@ type CLIExecutor interface {
 
 type executor struct {
 	binPath string
-	apiKey  string // ANTHROPIC_API_KEY; injected into subprocess env if non-empty
+	// Auth via CLAUDE_CODE_OAUTH_TOKEN env var (set in .env) or ~/.claude/ credentials.
+	// No API key injection — avoids conflicts with ANTHROPIC_API_KEY in the parent env.
 }
 
 // New returns a CLIExecutor. Returns error if claude is not in PATH.
 // Callers must treat (nil, err) as non-fatal: api-mode continues without CLI.
-func New(apiKey string) (CLIExecutor, error) {
+func New() (CLIExecutor, error) {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return nil, fmt.Errorf("claude binary not found in PATH: %w", err)
 	}
-	return &executor{binPath: path, apiKey: apiKey}, nil
+	return &executor{binPath: path}, nil
 }
 
 func (e *executor) Execute(ctx context.Context, req CLIRequest) (<-chan CLIEvent, error) {
 	args := buildArgs(req)
 	cmd := exec.CommandContext(ctx, e.binPath, args...) // #nosec G204 — binPath from LookPath
-	cmd.Env = os.Environ()
-	if e.apiKey != "" {
-		cmd.Env = append(cmd.Env, "ANTHROPIC_API_KEY="+e.apiKey)
+	// Strip ANTHROPIC_API_KEY — prevents conflict when CLAUDE_CODE_OAUTH_TOKEN is set.
+	// CLAUDE_CODE_OAUTH_TOKEN is inherited naturally from os.Environ().
+	base := os.Environ()
+	filtered := make([]string, 0, len(base))
+	for _, v := range base {
+		if !strings.HasPrefix(v, "ANTHROPIC_API_KEY=") {
+			filtered = append(filtered, v)
+		}
 	}
+	cmd.Env = filtered
 	cmd.Dir = os.TempDir() // prevents subprocess reading local CLAUDE.md / hooks
 
 	stdout, err := cmd.StdoutPipe()
