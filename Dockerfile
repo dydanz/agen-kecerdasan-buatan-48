@@ -25,7 +25,7 @@ COPY config.toml    .
 COPY identity/      identity/
 COPY skills/        skills/
 
-RUN mkdir -p sessions logs && chown -R akb48:akb48 /app
+RUN mkdir -p sessions logs brain && chown -R akb48:akb48 /app
 
 USER akb48
 
