@@ -2,7 +2,9 @@
 
 [![CI](https://github.com/dydanz/agen-kecerdasan-buatan-48/actions/workflows/ci.yml/badge.svg)](https://github.com/dydanz/agen-kecerdasan-buatan-48/actions/workflows/ci.yml)
 [![Go 1.25](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev/doc/go1.25)
-[![Phase](https://img.shields.io/badge/milestone-phase%207%20%E2%80%94%20%40mention-5865F2)](https://github.com/dydanz/agen-kecerdasan-buatan-48/milestone/1)
+[![Phase](https://img.shields.io/badge/milestone-phase%208%20%E2%80%94%20claude--cli%20backend-5865F2)](https://github.com/dydanz/agen-kecerdasan-buatan-48/milestone/1)
+
+**[HOW-TO-INSTALL →](HOW-TO-INSTALL.md)** — full setup guide: clone, credentials, Discord bot, Docker run, brain test, skill authoring.
 
 ---
 
@@ -45,14 +47,18 @@ Kabayan responding to an `@mention` in a Discord server channel — threaded rep
 | Runtime | Go 1.25, `anthropic-sdk-go` |
 | Chat adapters | Discord (`discordgo v0.28`), Telegram (`go-telegram-bot-api/v5`), CLI |
 | LLM | Claude Sonnet 4.6, Claude Haiku 4.5 (extraction) |
-| Brain | GBrain over stdio MCP (JSON-RPC 2.0), PostgreSQL + pgvector |
+| Brain | `mcp-server-memory` over stdio MCP (JSON-RPC 2.0), JSONL persistence |
 | Config | TOML, secrets via env vars only |
 | Deployment | Docker (local), VPS + systemd (production) |
 | CI/CD | GitHub Actions — build, vet, test, PR description gate |
 
 ---
 
-## Quick Start (CLI mode)
+## Quick Start
+
+**Docker + Discord (recommended):** see [HOW-TO-INSTALL.md](HOW-TO-INSTALL.md) for the full walkthrough.
+
+**CLI mode (local dev):**
 
 ```bash
 git clone https://github.com/dydanz/agen-kecerdasan-buatan-48
@@ -63,69 +69,6 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ./akb48 --validate   # verify config
 ./akb48              # start with CLI adapter
 ```
-
----
-
-## Run via Docker (Discord adapter)
-
-```bash
-cp .env.example .env   # fill ANTHROPIC_API_KEY + DISCORD_BOT_TOKEN
-# add your Discord snowflake user ID to deploy/config.docker.toml → allowed_user_ids
-
-make docker-build
-make docker-up
-make docker-logs
-```
-
----
-
-## Enable Discord
-
-1. Create a bot at [discord.com/developers](https://discord.com/developers/applications) → Bot tab → copy token
-2. Enable **Message Content Intent** and **Direct Messages** under Privileged Gateway Intents
-3. Add `DISCORD_BOT_TOKEN` to `.env`
-4. Add your snowflake user ID (Settings → Advanced → Developer Mode → right-click your name → Copy ID) to `allowed_user_ids` in `config.toml`
-5. Set `adapters.discord.enabled = true`, run
-
-DM the bot or use `/ask <message>` in any server channel (ephemeral — only you see the reply).
-
-To enable `@mention` response in server channels, set `mention_response = true` under `[adapters.discord]` — bot replies threaded to the original mention.
-
----
-
-## Enable Telegram (fallback)
-
-```toml
-[adapters.discord]
-enabled = false
-
-[adapters.telegram]
-enabled = true
-token_env = "TELEGRAM_BOT_TOKEN"
-allowed_user_ids = [YOUR_TELEGRAM_USER_ID]
-```
-
-Sessions are portable — switching adapters preserves history.
-
----
-
-## Add a Skill (no code changes)
-
-```bash
-mkdir -p skills/my-skill
-cat > skills/my-skill/SKILL.md << 'EOF'
----
-name: my-skill
-description: What this skill does
-triggers:
-  - keyword one
-  - keyword two
----
-Step-by-step instructions for the LLM.
-EOF
-```
-
-Hot-reloads on next message.
 
 ---
 
@@ -188,7 +131,7 @@ Tickets follow the **KLW-XXX** convention. Every feature shipped in this repo ha
 | 5 | Hello World Validation | KLW-020–021 | ✅ Done |
 | 6 | Discord Adapter + Docker | KLW-022–027 | ✅ Done |
 | 7 | Discord @mention in server channels | KLW-028–030 | ✅ Done |
-| 8 | Claude CLI backend (subprocess LLM) | KLW-031–034 | 🔄 In progress |
+| 8 | Claude CLI backend + GBrain (mcp-server-memory) | KLW-031–034 | ✅ Done |
 
 **Total:** ~2,500 lines of Go · 30 tickets · 8 phases
 

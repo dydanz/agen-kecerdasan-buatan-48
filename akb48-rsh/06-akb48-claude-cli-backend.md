@@ -185,7 +185,7 @@ Use `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) but **only** as an env
 
 ### Path A — Subprocess backend (recommended)
 
-Replace `anthropic-sdk-go` direct calls with a subprocess wrapper. AKB48 spawns `claude` per message via stream-json protocol. **This is proven working** — see Section 10 for the exact implementation extracted from Electrum Agent Gateway.
+Replace `anthropic-sdk-go` direct calls with a subprocess wrapper. AKB48 spawns `claude` per message via stream-json protocol. **This is proven working** — see Section 10 for the exact implementation.
 
 **Credential priority for AKB48 subprocess mode:**
 - `CLAUDE_CODE_OAUTH_TOKEN` env var (from `claude setup-token`) → subscription billing
@@ -231,7 +231,7 @@ Read `~/.claude/.credentials.json`, extract `sk-ant-oat01-...`, pass to `anthrop
 - If not: guide through `ANTHROPIC_API_KEY` setup (current path)
 
 **Phase B (subprocess LLM caller):**
-- New `internal/llm/claude_cli.go` — port the Electrum `executor.go` design (Section 10) to AKB48
+- New `internal/llm/claude_cli.go` — port the `executor.go` design (Section 10) to AKB48
 - Interface: `CLIExecutor` port with `Execute(ctx, CLIRequest) (<-chan CLIEvent, error)`
 - Non-fatal wiring: `New()` returns `(nil, error)` if binary absent — api-mode continues
 - Config switch: `backend = "api"` (existing `anthropic-sdk-go`) | `backend = "claude-cli"` (subprocess)
@@ -244,10 +244,7 @@ Read `~/.claude/.credentials.json`, extract `sk-ant-oat01-...`, pass to `anthrop
 
 ---
 
-## 10. Proven Implementation — Electrum Agent Gateway
-
-**Source:** `electrum-agent-gateway/internal/nalar/adapter/outbound/claudecli/`  
-**Status:** Production-deployed, fully tested.
+## 10. Proven Implementation
 
 This is the reference implementation. Port this directly to AKB48 rather than writing from scratch.
 
