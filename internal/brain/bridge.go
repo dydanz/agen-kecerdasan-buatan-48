@@ -86,12 +86,10 @@ func (b *GBrainBridge) SearchEntities(ctx context.Context, query string, limit i
 	}
 
 	args, _ := json.Marshal(map[string]any{
-		"query":        query,
-		"limit":        limit,
-		"entity_types": []string{"person", "project", "decision", "product", "policy"},
+		"query": query,
 	})
 
-	result, err := b.client.CallTool(ctx, "search", args)
+	result, err := b.client.CallTool(ctx, "search_nodes", args)
 	if err != nil {
 		slog.Debug("GBrain search failed", "query", query, "error", err)
 		return "", nil
@@ -184,39 +182,35 @@ func (b *GBrainBridge) attemptRestart(ctx context.Context) {
 		"max_attempts", maxAttempts)
 }
 
-// formatSearchResults formats raw GBrain search results as a bullet list.
+// formatSearchResults formats search_nodes response as a bullet list.
+// Response shape: {"entities":[{"name":"...","entityType":"...","observations":["..."]}],"relations":[...]}
 func formatSearchResults(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""
 	}
 
-	// Try array of objects with title/type/created_at
-	var items []map[string]any
-	if err := json.Unmarshal(raw, &items); err == nil && len(items) > 0 {
+	var resp struct {
+		Entities []struct {
+			Name         string   `json:"name"`
+			EntityType   string   `json:"entityType"`
+			Observations []string `json:"observations"`
+		} `json:"entities"`
+	}
+	if err := json.Unmarshal(raw, &resp); err == nil && len(resp.Entities) > 0 {
 		var lines []string
-		for _, item := range items {
-			title, _ := item["title"].(string)
-			entityType, _ := item["type"].(string)
-			createdAt, _ := item["created_at"].(string)
-			if title == "" {
-				continue
+		for _, e := range resp.Entities {
+			line := "- " + e.Name
+			if e.EntityType != "" {
+				line += " (" + e.EntityType + ")"
 			}
-			line := "- " + title
-			if entityType != "" {
-				line += " (" + entityType
-				if createdAt != "" && len(createdAt) >= 10 {
-					line += ", " + createdAt[:10]
-				}
-				line += ")"
+			if len(e.Observations) > 0 {
+				line += ": " + e.Observations[0]
 			}
 			lines = append(lines, line)
 		}
-		if len(lines) > 0 {
-			return strings.Join(lines, "\n")
-		}
+		return strings.Join(lines, "\n")
 	}
 
-	// Fallback: return raw as string
 	s := strings.TrimSpace(string(raw))
 	if s == "null" || s == "[]" || s == "{}" {
 		return ""
