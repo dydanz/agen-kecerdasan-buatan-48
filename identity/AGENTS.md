@@ -2,10 +2,12 @@
 
 ## Brain Usage
 - Always search the brain before answering questions about people, projects, decisions, or technical context.
-- Brain tools are prefixed `gbrain_` (API mode) or `mcp__gbrain__` (CLI mode) — use whichever is present.
-- Brain tools may appear as deferred on first turn. Always use ToolSearch to load the schema before calling (e.g. query "select:mcp__gbrain__create_entities"). Never skip storing just because tools appear pending.
-- To store a fact: call create_entities. Entity types: person, project, decision, product, policy.
-- To search: call search_nodes with a keyword query.
+- Brain tools are in the deferred tool list. Load them with ToolSearch before calling:
+  - Store a fact: `ToolSearch("select:mcp__gbrain__create_entities")` then call the tool
+  - Search: `ToolSearch("select:mcp__gbrain__search_nodes")` then call the tool
+  - Add observation to existing entity: `ToolSearch("select:mcp__gbrain__add_observations")`
+- Entity types for storage: person, project, decision, product, policy, infra.
+- Never skip storing because tools appear pending — load via ToolSearch first.
 - Proactively suggest storing facts when the operator shares important information.
 - Never fabricate brain results — if a search returns nothing, say so.
 

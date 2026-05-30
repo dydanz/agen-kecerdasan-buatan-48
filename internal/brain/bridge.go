@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -183,14 +184,23 @@ func (b *GBrainBridge) attemptRestart(ctx context.Context) {
 }
 
 // CLIMCPConfig returns MCP config JSON for passing to `claude --mcp-config`.
-// The subprocess inherits MEMORY_FILE_PATH from env — no need to embed it here.
+// Embeds MEMORY_FILE_PATH explicitly so the MCP subprocess uses the right file
+// regardless of whether Claude Code inherits the parent env.
 func (b *GBrainBridge) CLIMCPConfig() ([]byte, error) {
+	env := map[string]any{}
+	if v := os.Getenv("MEMORY_FILE_PATH"); v != "" {
+		env["MEMORY_FILE_PATH"] = v
+	}
+	server := map[string]any{
+		"command": b.cfg.GBrainCommand,
+		"args":    b.cfg.GBrainArgs,
+	}
+	if len(env) > 0 {
+		server["env"] = env
+	}
 	cfg := map[string]any{
 		"mcpServers": map[string]any{
-			"gbrain": map[string]any{
-				"command": b.cfg.GBrainCommand,
-				"args":    b.cfg.GBrainArgs,
-			},
+			"gbrain": server,
 		},
 	}
 	return json.Marshal(cfg)

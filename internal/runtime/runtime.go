@@ -199,12 +199,19 @@ func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, tex
 		}
 	}
 
+	// Allow ToolSearch so LLM can load deferred mcp__gbrain__* schemas.
+	var allowedTools []string
+	if mcpConfigPath != "" {
+		allowedTools = []string{"ToolSearch"}
+	}
+
 	ch, err := r.cliExec.Execute(ctx, claudecli.CLIRequest{
 		Prompt:             text,
 		SystemPrompt:       systemPrompt,
 		AppendSystemPrompt: appendCtx,
 		Model:              r.cfg.LLM.Model,
 		MCPConfig:          mcpConfigPath,
+		AllowedTools:       allowedTools,
 	})
 	if err != nil {
 		return "", fmt.Errorf("cli execute: %w", err)
