@@ -182,6 +182,20 @@ func (b *GBrainBridge) attemptRestart(ctx context.Context) {
 		"max_attempts", maxAttempts)
 }
 
+// CLIMCPConfig returns MCP config JSON for passing to `claude --mcp-config`.
+// The subprocess inherits MEMORY_FILE_PATH from env — no need to embed it here.
+func (b *GBrainBridge) CLIMCPConfig() ([]byte, error) {
+	cfg := map[string]any{
+		"mcpServers": map[string]any{
+			"gbrain": map[string]any{
+				"command": b.cfg.GBrainCommand,
+				"args":    b.cfg.GBrainArgs,
+			},
+		},
+	}
+	return json.Marshal(cfg)
+}
+
 // formatSearchResults formats search_nodes response as a bullet list.
 // Response shape: {"entities":[{"name":"...","entityType":"...","observations":["..."]}],"relations":[...]}
 func formatSearchResults(raw json.RawMessage) string {

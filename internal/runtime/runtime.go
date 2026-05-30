@@ -188,11 +188,23 @@ func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, tex
 	history := r.sessionManager.GetContextTurns(sess)
 	appendCtx := buildAppendContext(history)
 
+	// Wire brain as MCP server so claude subprocess can call gbrain_* tools.
+	mcpConfigPath := ""
+	if r.bridge != nil && r.bridge.Available() {
+		mcpConfigPath, err = writeMCPConfigFile(r.bridge)
+		if err != nil {
+			slog.Warn("failed to write MCP config — brain tools unavailable this turn", "error", err)
+		} else {
+			defer os.Remove(mcpConfigPath)
+		}
+	}
+
 	ch, err := r.cliExec.Execute(ctx, claudecli.CLIRequest{
 		Prompt:             text,
 		SystemPrompt:       systemPrompt,
 		AppendSystemPrompt: appendCtx,
 		Model:              r.cfg.LLM.Model,
+		MCPConfig:          mcpConfigPath,
 	})
 	if err != nil {
 		return "", fmt.Errorf("cli execute: %w", err)
@@ -262,6 +274,26 @@ func (r *AKB48Runtime) SessionManager() *session.SessionManager {
 // BrainAvailable reports whether GBrain is connected.
 func (r *AKB48Runtime) BrainAvailable() bool {
 	return r.bridge != nil && r.bridge.Available()
+}
+
+// writeMCPConfigFile writes brain MCP config to a temp file and returns its path.
+// Caller must os.Remove the file when done.
+func writeMCPConfigFile(b *brain.GBrainBridge) (string, error) {
+	data, err := b.CLIMCPConfig()
+	if err != nil {
+		return "", err
+	}
+	f, err := os.CreateTemp("", "akb48-mcp-*.json")
+	if err != nil {
+		return "", err
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return "", err
+	}
+	f.Close()
+	return f.Name(), nil
 }
 
 func countSkillDirs(dir string) int {
