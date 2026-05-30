@@ -10,13 +10,13 @@ services:
     dns:
       - 8.8.8.8
       - 8.8.4.4
+    environment:
+      MEMORY_FILE_PATH: /app/brain/memory.jsonl
     volumes:
       - sessions:/app/sessions
       - logs:/app/logs
+      - brain:/app/brain
       - ./config.docker.toml:/app/config.toml:ro
-    # Uncomment when brain.enabled = true in config.toml:
-    # depends_on:
-    #   - gbrain
 
   # GBrain + Postgres — only needed when brain.enabled = true in config.toml.
   # akb48 starts in degraded mode (brain tools unavailable) if these are not running.
@@ -48,6 +48,7 @@ volumes:
   pgdata:
   sessions:
   logs:
+  brain:
 
 secrets:
   pg_password:

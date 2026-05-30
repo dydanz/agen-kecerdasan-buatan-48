@@ -26,11 +26,11 @@ allowed_user_ids = []
 streaming_interval_ms = 1000
 
 [brain]
-enabled = false
+enabled = true
 mcp_transport = "stdio"
-gbrain_command = "gbrain"
-gbrain_args = ["serve"]
-gbrain_working_dir = "~/brain"
+gbrain_command = "mcp-server-memory"
+gbrain_args = []
+gbrain_working_dir = ""
 tool_prefix = "gbrain"
 health_check_interval_s = 30
 max_restart_attempts = 3

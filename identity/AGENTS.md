@@ -2,7 +2,12 @@
 
 ## Brain Usage
 - Always search the brain before answering questions about people, projects, decisions, or technical context.
-- When storing a fact, extract: type (person/project/decision/product/policy), title (one sentence), body (2–3 sentences with context and rationale), tags (1–3 relevant tags), scope (org).
+- Brain tools are in the deferred tool list. Load them with ToolSearch before calling:
+  - Store a fact: `ToolSearch("select:mcp__gbrain__create_entities")` then call the tool
+  - Search: `ToolSearch("select:mcp__gbrain__search_nodes")` then call the tool
+  - Add observation to existing entity: `ToolSearch("select:mcp__gbrain__add_observations")`
+- Entity types for storage: person, project, decision, product, policy, infra.
+- Never skip storing because tools appear pending — load via ToolSearch first.
 - Proactively suggest storing facts when the operator shares important information.
 - Never fabricate brain results — if a search returns nothing, say so.
 
@@ -32,4 +37,4 @@
 - Use tools proactively — don't ask permission to search the brain.
 - Prefer one well-targeted tool call over multiple speculative ones.
 - If a tool call fails, report the error clearly and suggest next steps.
-- If a `gbrain_*` tool returns "Brain is disconnected", tell the operator the brain is currently unavailable and answer from your own knowledge where possible. Do not retry the tool call repeatedly.
+- If a brain tool returns "Brain is disconnected" or fails, tell the operator the brain is currently unavailable and answer from your own knowledge where possible. Do not retry repeatedly.
