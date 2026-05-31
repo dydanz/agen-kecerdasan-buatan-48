@@ -20,6 +20,7 @@ import (
 	"github.com/dydanz/akb48/internal/session"
 	"github.com/dydanz/akb48/internal/skills"
 	"github.com/dydanz/akb48/internal/tools"
+	githubtools "github.com/dydanz/akb48/internal/tools/github"
 	"github.com/dydanz/akb48/internal/types"
 )
 
@@ -54,6 +55,10 @@ type AKB48Runtime struct {
 func New(cfg *config.Config) (*AKB48Runtime, error) {
 	envReader := env.New(".env")
 	registry := tools.NewRegistry()
+
+	// Register built-in tools.
+	ghDef, ghHandler := githubtools.NewHandler(envReader, cfg.LLM.MaxToolResultTokens)
+	registry.Register(ghDef, ghHandler)
 	caller := llm.NewCaller(cfg, registry)
 	sessionMgr := session.NewSessionManager(cfg.Session)
 
