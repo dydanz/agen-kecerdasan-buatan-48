@@ -17,7 +17,7 @@ allowed_user_ids = []          # Add your Discord snowflake user ID (string)
 streaming_interval_ms = 1000
 slash_commands = true
 slash_command_guild_id = ""    # Set guild ID for instant /ask registration during dev
-mention_response = false       # set true to respond to @mentions in server channels
+mention_response = true       # set true to respond to @mentions in server channels
 
 [adapters.telegram]
 enabled = false

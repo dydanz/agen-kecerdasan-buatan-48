@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AKB48 (Agen Kecerdasan Buatan 48) is a **thin, self-hosted AI agent runtime** ("claw") for a solo operator. It connects Telegram/Discord to a compounding knowledge brain (GBrain), routes user intent to markdown skill files, and gets smarter without code deploys. The philosophy is **"thin harness, fat skills"**: the runtime is ~2,000–2,500 lines of Go; the intelligence lives in skill files and GBrain.
+AKB48 (Agen Kecerdasan Buatan 48) is a **thin, self-hosted AI agent runtime** ("claw") for a solo operator. It connects Telegram/Discord to a compounding **memory brain** — an MCP memory server (`@modelcontextprotocol/server-memory`, run as `mcp-server-memory`) — routes user intent to markdown skill files, and gets smarter without code deploys. The philosophy is **"thin harness, fat skills"**: the runtime is ~2,000–2,500 lines of Go; the intelligence lives in skill files and the memory brain.
 
 The project is currently in **design/planning phase**. All PRDs are in `akb48-prd/`, research in `akb48-rsh/`, and development/implementation plan are in `akb48-dev-plan/`. The first milestone is "Hello World" (PRDs 01–05), which proves the chat → LLM → brain → persistence pipeline end-to-end.
 
@@ -27,10 +27,9 @@ go run ./cmd/akb48/
 
 # Use a custom config file
 ./akb48 --config path/to/config.toml
-
-# GBrain must be running first (PRD-03 manages this automatically)
-gbrain serve
 ```
+
+The memory brain (`mcp-server-memory`) is spawned automatically as a child subprocess at startup over MCP stdio — there is no separate command to run. It must be installed and on `PATH` (`npm i -g @modelcontextprotocol/server-memory`).
 
 Environment variables required (never put secrets in `config.toml`):
 ```bash
@@ -63,7 +62,7 @@ LLM Caller (Claude Sonnet 4.6, streaming, goroutines + channels)
         │
         ▼
 Tool Executor (idempotency-checked UUID per call)
-    ├── gbrain_* tools (all exposed via MCP from `gbrain serve`)
+    ├── memory tools (exposed via MCP from the mcp-server-memory subprocess)
     ├── Web search
     └── GitHub API (Phase 2)
         │
@@ -121,7 +120,7 @@ Post-Turn Hooks (fire-and-forget via errgroup, never break main loop)
 └── config.toml
 ```
 
-GBrain lives separately at `~/brain/` — it has its own lifecycle independent of the claw runtime.
+The memory brain runs as a child subprocess (`mcp-server-memory`) spawned by the runtime over MCP stdio. Its knowledge graph persists to `MEMORY_FILE_PATH` (e.g. `/app/brain/memory.jsonl` in Docker). There is no separate standalone daemon.
 
 ---
 
@@ -163,15 +162,17 @@ func(ctx context.Context, input json.RawMessage) (string, error)
 Tool dispatch is logged to `tool-calls.jsonl` before and after execution. Idempotency key is checked before invoking any side-effecting handler.
 
 ### Post-Turn Hooks
-Hooks execute after every agent response via `errgroup.Go()`. **Failures in hooks must never propagate to the main loop** — recover all panics, log errors, continue. Built-in hooks: session persistence + metrics logging. Phase 2 adds memory flush and compaction check.
+Hooks execute after every agent response via `errgroup.Go()`. **Failures in hooks must never propagate to the main loop** — recover all panics, log errors, continue. Built-in hooks: session persistence + metrics logging. Phase 10 (PRD-10) adds memory flush + compaction.
 
-### GBrain MCP Connection
-GBrain is managed as a child subprocess (`gbrain serve` over stdio). AKB48:
-1. Spawns the process at startup
-2. Discovers tools dynamically via `tools/list` (don't hardcode tool names)
-3. Registers all tools with `gbrain_` prefix in ToolRegistry
+### Memory Brain MCP Connection
+The memory brain is `mcp-server-memory`, managed as a child subprocess over MCP stdio. AKB48:
+1. Spawns the process at startup (command from `[brain]` config)
+2. Discovers tools dynamically via `tools/list` (don't hardcode tool names) — currently 9: `create_entities`, `search_nodes`, `add_observations`, relations, etc.
+3. Registers all tools in ToolRegistry with the configured prefix (`tool_prefix`, currently the legacy value `gbrain` → `gbrain_*` in api mode; surfaced as `mcp__gbrain__*` to the Claude subprocess in cli mode)
 4. Health-checks every 30s, auto-restarts up to 3 times
-5. If brain is unavailable: all `gbrain_*` tools return an error string; the LLM handles it gracefully; the process continues (degraded mode)
+5. If the brain is unavailable: all memory tools return an error string; the LLM handles it gracefully; the process continues (degraded mode)
+
+> The `gbrain` prefix and `gbrain_*` config keys are legacy names from the original standalone-daemon design (PRD-03). The backend is now `mcp-server-memory`. Renaming the prefix/keys is a separate breaking change, not yet done.
 
 ### Session Persistence
 JSONL files, one per session. **Append-only** — each turn is one line. Never rewrite the full file. Use `encoding/json` for marshalling. On startup, load the most recent session file per session ID. Session file naming: replace `:` with `_` (e.g., `main_telegram_123456789.jsonl`). Warn if any file exceeds 10MB.
@@ -196,10 +197,13 @@ allowed_user_ids = [123456789]      # Silently reject all other users
 streaming_interval_ms = 1000        # editMessageText cadence
 
 [brain]
-gbrain_command = "gbrain"
-gbrain_args = ["serve"]
-gbrain_working_dir = "~/brain"
-tool_prefix = "gbrain"
+enabled = true
+mcp_transport = "stdio"
+gbrain_command = "mcp-server-memory"   # legacy key name; spawns the MCP memory server
+gbrain_args = []
+gbrain_working_dir = ""
+tool_prefix = "gbrain"                 # legacy prefix → gbrain_* / mcp__gbrain__*; rename tracked separately
+# Knowledge graph file is set via the MEMORY_FILE_PATH env var, not config.toml
 
 [session]
 max_turns_in_context = 50
@@ -249,7 +253,7 @@ Body: step-by-step process, output format, constraints. Keep under 2,000 tokens.
 |-----|-----------|-------------|
 | PRD-01 | Core Runtime — entry point, config, LLM caller, tool registry | — |
 | PRD-02 | Channel Adapters — CLI and Telegram | PRD-01 |
-| PRD-03 | GBrain Integration — MCP client, tool discovery | PRD-01 |
+| PRD-03 | Memory Brain Integration — MCP client, tool discovery (backend: `mcp-server-memory`) | PRD-01 |
 | PRD-04 | Identity & Skill System — context assembly, skill resolver | PRD-01 |
 | PRD-05 | Session Management — JSONL persistence, post-turn hooks | PRD-01, PRD-02 |
 | PRD-xx | <Placeholder for future development> | PRD-x1, PRD-x2 |
@@ -264,8 +268,8 @@ Read the full PRD before implementing any component. Each PRD contains the compl
 - **Never auto-deploy to production** — always require explicit operator approval in chat
 - **Secrets via env vars only** — `config.toml` stores key names, not values
 - **Code execution in Docker sandbox only** — never execute arbitrary code on the host (Phase 2)
-- **Memory flush before compaction** — always extract facts to GBrain before summarizing session history, or knowledge is permanently lost
-- **Let the LLM decide when to search brain** — don't pre-fetch brain context on every turn; instruct the LLM in AGENTS.md to search proactively via tools
+- **Memory flush before compaction** — always extract facts to the memory brain before summarizing session history, or knowledge is permanently lost
+- **Let the LLM decide when to search the brain** — don't pre-fetch brain context on every turn; instruct the LLM in AGENTS.md to search proactively via tools
 
 ---
 
@@ -273,11 +277,10 @@ Read the full PRD before implementing any component. Each PRD contains the compl
 
 - LangGraph, CrewAI, AutoGen — wrong abstraction for this architecture
 - Fine-tuning — not until Phase 3 at earliest
-- Purpose-built vector databases — PostgreSQL + pgvector (GBrain handles this)
 - Autonomous production deploys — human approval always required
 - Pre-fetching brain context on every message — let the LLM use tools on demand
-- Storing everything in memory — GBrain has forgetting policies; respect them
-- Treating RAG as memory — GBrain uses hybrid search (vector + keyword + graph), not plain RAG
+- Storing everything in the brain — be selective about what you persist; the memory graph is not a dumping ground
+- Treating RAG as memory — the memory brain is an entity/relation knowledge graph queried via `search_nodes`, not a plain RAG vector store
 
 ## graphify
 

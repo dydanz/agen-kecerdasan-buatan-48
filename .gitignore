@@ -65,5 +65,10 @@ graphify-out/.needs_update
 /akb48
 /klawmbing
 
+# Runtime data — never commit
+sessions/
+logs/
+brain/*
+
 # Docker secrets (never commit)
 deploy/secrets/
