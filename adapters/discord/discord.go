@@ -63,16 +63,17 @@ func New(cfg config.DiscordConfig, handler runtime.MessageHandler) (*Adapter, er
 func (a *Adapter) Start(ctx context.Context) error {
 	a.session.AddHandler(a.onMessage)
 	a.session.AddHandler(a.onInteraction)
+	a.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+		slog.Info("Discord adapter started", "username", r.User.Username)
+		if a.cfg.SlashCommands {
+			a.registerSlashCommands()
+		}
+	})
 
 	if err := a.session.Open(); err != nil {
 		return fmt.Errorf("discord open: %w", err)
 	}
 
-	if a.cfg.SlashCommands {
-		a.registerSlashCommands()
-	}
-
-	slog.Info("Discord adapter started", "username", a.session.State.User.Username)
 	<-ctx.Done()
 	return a.session.Close()
 }
@@ -187,7 +188,18 @@ func (a *Adapter) onInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 }
 
 func (a *Adapter) process(channelID, userID, text string, ref *discordgo.MessageReference) {
-	a.session.ChannelTyping(channelID)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			a.session.ChannelTyping(channelID)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(8 * time.Second):
+			}
+		}
+	}()
 
 	msg := types.Message{
 		SessionID: fmt.Sprintf("main:discord:%s", userID),
@@ -206,7 +218,6 @@ func (a *Adapter) process(channelID, userID, text string, ref *discordgo.Message
 		}
 	}()
 
-	ctx := context.Background()
 	if err := a.handler(ctx, msg, tokens); err != nil {
 		slog.Error("Discord handler error", "error", err)
 		close(tokens)

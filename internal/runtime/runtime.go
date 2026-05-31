@@ -13,6 +13,7 @@ import (
 
 	"github.com/dydanz/akb48/internal/brain"
 	"github.com/dydanz/akb48/internal/config"
+	"github.com/dydanz/akb48/internal/env"
 	"github.com/dydanz/akb48/internal/identity"
 	"github.com/dydanz/akb48/internal/llm"
 	"github.com/dydanz/akb48/internal/llm/claudecli"
@@ -46,10 +47,12 @@ type AKB48Runtime struct {
 	coldOpener     *session.ColdOpener
 	bridge         *brain.GBrainBridge
 	hooks          []session.HookFunc
+	envReader      *env.Reader
 }
 
 // New creates and wires all runtime components.
 func New(cfg *config.Config) (*AKB48Runtime, error) {
+	envReader := env.New(".env")
 	registry := tools.NewRegistry()
 	caller := llm.NewCaller(cfg, registry)
 	sessionMgr := session.NewSessionManager(cfg.Session)
@@ -101,6 +104,7 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 		assembler:      assembler,
 		coldOpener:     coldOpener,
 		bridge:         brainBridge,
+		envReader:      envReader,
 	}
 
 	metricsPath := cfg.Session.StorageDir + "/tool-calls.jsonl"
@@ -281,6 +285,11 @@ func (r *AKB48Runtime) SessionManager() *session.SessionManager {
 // BrainAvailable reports whether GBrain is connected.
 func (r *AKB48Runtime) BrainAvailable() bool {
 	return r.bridge != nil && r.bridge.Available()
+}
+
+// EnvReader returns the gated env reader for use by tool handler factories.
+func (r *AKB48Runtime) EnvReader() *env.Reader {
+	return r.envReader
 }
 
 // writeMCPConfigFile writes brain MCP config to a temp file and returns its path.
