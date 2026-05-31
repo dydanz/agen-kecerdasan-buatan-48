@@ -301,3 +301,46 @@ func TestRuntime_ColdOpenerNilWhenNoBrain(t *testing.T) {
 		t.Error("cold opener should be nil when brain is disabled")
 	}
 }
+
+func TestDefaultAllowedTools_BrainUp(t *testing.T) {
+	tools := defaultAllowedTools(true)
+	required := []string{"Bash", "Read", "Write", "Glob", "Grep", "WebFetch", "ToolSearch"}
+	seen := make(map[string]bool)
+	for _, tool := range tools {
+		seen[tool] = true
+	}
+	for _, r := range required {
+		if !seen[r] {
+			t.Errorf("expected %q in brain-up toolset, got %v", r, tools)
+		}
+	}
+}
+
+func TestDefaultAllowedTools_BrainDown(t *testing.T) {
+	tools := defaultAllowedTools(false)
+	seen := make(map[string]bool)
+	for _, tool := range tools {
+		seen[tool] = true
+	}
+	required := []string{"Bash", "Read", "Write", "Glob", "Grep", "WebFetch"}
+	for _, r := range required {
+		if !seen[r] {
+			t.Errorf("expected %q in brain-down toolset, got %v", r, tools)
+		}
+	}
+	if seen["ToolSearch"] {
+		t.Error("ToolSearch must not appear when brain is down")
+	}
+	if len(tools) == 0 {
+		t.Error("toolset must never be empty")
+	}
+}
+
+func TestDefaultAllowedTools_NeverEmpty(t *testing.T) {
+	for _, mcpPresent := range []bool{true, false} {
+		tools := defaultAllowedTools(mcpPresent)
+		if len(tools) == 0 {
+			t.Errorf("defaultAllowedTools(%v) returned empty slice", mcpPresent)
+		}
+	}
+}

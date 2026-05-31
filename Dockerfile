@@ -14,7 +14,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o akb48 ./cmd/akb48/
 # Runtime stage
 FROM alpine:3.20
 
-RUN apk --no-cache add ca-certificates tzdata nodejs npm && \
+RUN apk --no-cache add \
+        ca-certificates tzdata \
+        nodejs npm \
+        curl git vim jq \
+        coreutils grep sed gawk \
+        openssh-client \
+        github-cli && \
     npm install -g @anthropic-ai/claude-code @modelcontextprotocol/server-memory && \
     addgroup -S akb48 && adduser -S akb48 -G akb48
 
