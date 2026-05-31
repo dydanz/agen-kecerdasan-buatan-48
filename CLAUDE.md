@@ -312,6 +312,8 @@ This project follows a lightweight multi-phase SDLC. Full agent: `.claude/agents
 
 **Ticket convention:** KLW-XXX (existing). PR description must include `Closes #N` to link GitHub issue.
 
+**PR creation skill:** `.claude/skills/github-pr/SKILL.md` — covers required fields, label taxonomy, GitHub Project linking, and project field values (Priority, Size, Estimate, Start/Target Date). Invoke via `/github-pr` or say "create PR".
+
 **ADRs:** in `akb48-adr/`. Add `adr-required` label to any PR affecting component interfaces, session contracts, runtime wiring, or conventions. ADR bot enforces within 48h of merge.
 
 **Dev plans:** in `akb48-dev-plan/`. Update if implementation deviates from plan.

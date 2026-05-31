@@ -28,6 +28,7 @@ type SessionTurn struct {
 	TokenUsage        types.TokenUsage `json:"token_usage"`
 	SkillUsed         string           `json:"skill_used,omitempty"`
 	LatencyMs         int64            `json:"latency_ms"`
+	ToolEventCount    int              `json:"tool_event_count,omitempty"`
 }
 
 type Session struct {

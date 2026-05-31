@@ -123,6 +123,7 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 		session.PersistSessionHook(sessionMgr),
 		session.LogMetricsHook(metricsPath),
 		session.CompactionHook(cfg.Session, sessionMgr, brainBridge, extractor),
+		session.NarrationGuardHook(),
 	}
 
 	slog.Info("AKB48 initialised",
@@ -146,12 +147,13 @@ func (r *AKB48Runtime) HandleMessage(ctx context.Context, msg types.Message, tok
 	turnID := uuid.NewString()
 	var finalText string
 	var tokenUsage types.TokenUsage
+	var toolEventCount int
 
 	switch r.cfg.LLM.Backend {
 	case "claude-cli":
-		finalText, err = r.handleCLI(ctx, sess, msg.Text, tokens, turnID)
+		finalText, toolEventCount, err = r.handleCLI(ctx, sess, msg.Text, tokens, turnID)
 	default:
-		finalText, tokenUsage, err = r.handleAPI(ctx, sess, msg.Text, tokens, turnID)
+		finalText, tokenUsage, toolEventCount, err = r.handleAPI(ctx, sess, msg.Text, tokens, turnID)
 	}
 	if err != nil {
 		return err
@@ -164,13 +166,14 @@ func (r *AKB48Runtime) HandleMessage(ctx context.Context, msg types.Message, tok
 		AssistantResponse: finalText,
 		TokenUsage:        tokenUsage,
 		LatencyMs:         time.Since(start).Milliseconds(),
+		ToolEventCount:    toolEventCount,
 	}
 	sess.AddTurn(turn)
 	session.RunHooks(r.hooks, sess, turn)
 	return nil
 }
 
-func (r *AKB48Runtime) handleAPI(ctx context.Context, sess *session.Session, text string, tokens chan<- string, turnID string) (string, types.TokenUsage, error) {
+func (r *AKB48Runtime) handleAPI(ctx context.Context, sess *session.Session, text string, tokens chan<- string, turnID string) (string, types.TokenUsage, int, error) {
 	apiTools := r.registry.Definitions()
 	toolNames := make([]string, len(apiTools))
 	for i, d := range apiTools {
@@ -184,7 +187,7 @@ func (r *AKB48Runtime) handleAPI(ctx context.Context, sess *session.Session, tex
 	}
 	systemPrompt, messages, err := r.assembler.Build(sess, r.sessionManager, text, coldContext)
 	if err != nil {
-		return "", types.TokenUsage{}, fmt.Errorf("build context: %w", err)
+		return "", types.TokenUsage{}, 0, fmt.Errorf("build context: %w", err)
 	}
 	messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(text)))
 	result, err := r.llmCaller.Call(ctx, llm.CallParams{
@@ -194,19 +197,19 @@ func (r *AKB48Runtime) handleAPI(ctx context.Context, sess *session.Session, tex
 		TurnID:   turnID,
 	})
 	if err != nil {
-		return "", types.TokenUsage{}, fmt.Errorf("llm call: %w", err)
+		return "", types.TokenUsage{}, 0, fmt.Errorf("llm call: %w", err)
 	}
-	return result.Text, result.TokenUsage, nil
+	return result.Text, result.TokenUsage, result.ToolCalls, nil
 }
 
-func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, text string, tokens chan<- string, turnID string) (string, error) {
+func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, text string, tokens chan<- string, turnID string) (string, int, error) {
 	if r.cliExec == nil {
-		return "", fmt.Errorf("cli backend unavailable (claude binary missing or not authenticated)")
+		return "", 0, fmt.Errorf("cli backend unavailable (claude binary missing or not authenticated)")
 	}
 	// Get system prompt from assembler; discard messages[] — history goes via --append-system-prompt.
 	systemPrompt, _, err := r.assembler.Build(sess, r.sessionManager, text, "")
 	if err != nil {
-		return "", fmt.Errorf("build system prompt: %w", err)
+		return "", 0, fmt.Errorf("build system prompt: %w", err)
 	}
 	history := r.sessionManager.GetContextTurns(sess)
 	appendCtx := buildAppendContext(history)
@@ -250,10 +253,11 @@ func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, tex
 		AllowedTools:       allowedTools,
 	})
 	if err != nil {
-		return "", fmt.Errorf("cli execute: %w", err)
+		return "", 0, fmt.Errorf("cli execute: %w", err)
 	}
 
 	var sb strings.Builder
+	var toolEventCount int
 	for evt := range ch {
 		switch evt.Type {
 		case "text":
@@ -261,13 +265,20 @@ func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, tex
 			select {
 			case tokens <- evt.Content:
 			case <-ctx.Done():
-				return sb.String(), ctx.Err()
+				return sb.String(), toolEventCount, ctx.Err()
+			}
+		case "tool_use":
+			toolEventCount++
+			indicator := fmt.Sprintf("\n⚙ %s\n", evt.ToolName)
+			select {
+			case tokens <- indicator:
+			default:
 			}
 		case "error":
-			return sb.String(), evt.Err
+			return sb.String(), toolEventCount, evt.Err
 		}
 	}
-	return sb.String(), nil
+	return sb.String(), toolEventCount, nil
 }
 
 // Start loads sessions and prepares the runtime.

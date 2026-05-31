@@ -28,10 +28,11 @@ type CLIRequest struct {
 
 // CLIEvent is one streamed output from the claude subprocess.
 type CLIEvent struct {
-	Type    string  // "text" | "done" | "error"
-	Content string  // non-empty for "text"
-	CostUSD float64 // non-zero for "done"
-	Err     error   // non-nil for "error"
+	Type     string  // "text" | "tool_use" | "tool_result" | "done" | "error"
+	Content  string  // non-empty for "text"
+	ToolName string  // tool name for "tool_use" and "tool_result"
+	CostUSD  float64 // non-zero for "done"
+	Err      error   // non-nil for "error"
 }
 
 // CLIExecutor spawns a claude subprocess per turn and streams CLIEvents.
@@ -93,8 +94,7 @@ func (e *executor) Execute(ctx context.Context, req CLIRequest) (<-chan CLIEvent
 		scanner.Buffer(make([]byte, 1<<20), 1<<20) // 1MB — default 64KB silently truncates
 
 		for scanner.Scan() {
-			evt, ok := parseStreamLine(scanner.Bytes(), &lastMsgID, &lastTextLen)
-			if ok {
+			for _, evt := range parseStreamLine(scanner.Bytes(), &lastMsgID, &lastTextLen) {
 				if evt.Type == "done" || evt.Type == "error" {
 					doneEmitted = true
 				}
@@ -157,15 +157,20 @@ func buildArgs(req CLIRequest) []string {
 	return args
 }
 
-type cliMessage struct {
-	ID      string `json:"id"`
-	Content []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	} `json:"content"`
+type contentBlock struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+	Name string `json:"name"` // populated for tool_use blocks
 }
 
-func parseStreamLine(line []byte, lastMsgID *string, lastTextLen *int) (CLIEvent, bool) {
+type cliMessage struct {
+	ID      string         `json:"id"`
+	Content []contentBlock `json:"content"`
+}
+
+// parseStreamLine parses one JSON line from the claude subprocess stream.
+// Returns zero or more CLIEvents — one line may produce both a text delta and a tool_use event.
+func parseStreamLine(line []byte, lastMsgID *string, lastTextLen *int) []CLIEvent {
 	var raw struct {
 		Type    string      `json:"type"`
 		Subtype string      `json:"subtype"`
@@ -173,18 +178,23 @@ func parseStreamLine(line []byte, lastMsgID *string, lastTextLen *int) (CLIEvent
 		CostUSD float64     `json:"cost_usd"`
 	}
 	if err := json.Unmarshal(line, &raw); err != nil {
-		return CLIEvent{}, false
+		return nil
 	}
 
 	switch raw.Type {
 	case "assistant":
 		if raw.Message == nil {
-			return CLIEvent{}, false
+			return nil
 		}
 		var full strings.Builder
+		var toolEvents []CLIEvent
+
 		for _, block := range raw.Message.Content {
-			if block.Type == "text" {
+			switch block.Type {
+			case "text":
 				full.WriteString(block.Text)
+			case "tool_use":
+				toolEvents = append(toolEvents, CLIEvent{Type: "tool_use", ToolName: block.Name})
 			}
 		}
 		fullText := full.String()
@@ -200,18 +210,34 @@ func parseStreamLine(line []byte, lastMsgID *string, lastTextLen *int) (CLIEvent
 		delta := fullText[*lastTextLen:]
 		*lastTextLen = len(fullText)
 
+		var evts []CLIEvent
 		if delta != "" {
-			return CLIEvent{Type: "text", Content: delta}, true
+			evts = append(evts, CLIEvent{Type: "text", Content: delta})
 		}
+		evts = append(evts, toolEvents...)
+		return evts
+
+	case "tool":
+		// Tool result messages from the subprocess — surface as tool_result events.
+		if raw.Message == nil {
+			return nil
+		}
+		var evts []CLIEvent
+		for _, block := range raw.Message.Content {
+			if block.Type == "tool_result" {
+				evts = append(evts, CLIEvent{Type: "tool_result"})
+			}
+		}
+		return evts
 
 	case "result":
 		switch raw.Subtype {
 		case "success":
-			return CLIEvent{Type: "done", CostUSD: raw.CostUSD}, true
+			return []CLIEvent{{Type: "done", CostUSD: raw.CostUSD}}
 		default:
-			return CLIEvent{Type: "error", Err: fmt.Errorf("claude result: %s", raw.Subtype)}, true
+			return []CLIEvent{{Type: "error", Err: fmt.Errorf("claude result: %s", raw.Subtype)}}
 		}
 	}
 
-	return CLIEvent{}, false // system:init, tool_use, other types silently ignored
+	return nil // system:init and other types silently ignored
 }

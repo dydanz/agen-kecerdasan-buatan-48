@@ -5,12 +5,29 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"regexp"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dydanz/akb48/internal/types"
 )
+
+// actionVerbRe matches response text that claims action was performed.
+var actionVerbRe = regexp.MustCompile(`(?i)\b(fetch(ing)?|running|executing|reading the repo|cloning|downloading)\b`)
+
+// NarrationGuardHook logs WARN when the agent claims action but executed no tools.
+// Turn still persists — this is a signal, not a block.
+func NarrationGuardHook() HookFunc {
+	return func(_ context.Context, sess *Session, turn SessionTurn) error {
+		if turn.ToolEventCount == 0 && actionVerbRe.MatchString(turn.AssistantResponse) {
+			slog.Warn("narration guard: agent claimed action but executed no tools",
+				"turn_id", turn.TurnID,
+				"session_id", sess.SessionID)
+		}
+		return nil
+	}
+}
 
 // HookFunc is the signature for all post-turn hooks.
 type HookFunc func(ctx context.Context, session *Session, turn SessionTurn) error

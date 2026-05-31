@@ -179,3 +179,80 @@ func TestRunHooks_NoHooks(t *testing.T) {
 	RunHooks(nil, NewSession("test"), makeTestTurn())
 	RunHooks([]HookFunc{}, NewSession("test"), makeTestTurn())
 }
+
+func TestNarrationGuardHook_Trips(t *testing.T) {
+	// Action verb + zero tool events → WARN (we just check it doesn't error)
+	hook := NarrationGuardHook()
+	sess := NewSession("test-guard")
+	turn := SessionTurn{
+		TurnID:            "t1",
+		AssistantResponse: "Let me start fetching files from the repo now.",
+		ToolEventCount:    0,
+	}
+	if err := hook(context.Background(), sess, turn); err != nil {
+		t.Errorf("NarrationGuardHook must not return error, got: %v", err)
+	}
+}
+
+func TestNarrationGuardHook_NoTrip_ToolsExecuted(t *testing.T) {
+	hook := NarrationGuardHook()
+	sess := NewSession("test-guard-tools")
+	turn := SessionTurn{
+		TurnID:            "t2",
+		AssistantResponse: "I am fetching the repo contents.",
+		ToolEventCount:    2, // tools ran → no guard trip
+	}
+	if err := hook(context.Background(), sess, turn); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestNarrationGuardHook_NoTrip_NoVerbs(t *testing.T) {
+	hook := NarrationGuardHook()
+	sess := NewSession("test-guard-noverbs")
+	turn := SessionTurn{
+		TurnID:            "t3",
+		AssistantResponse: "The answer is 42.",
+		ToolEventCount:    0,
+	}
+	if err := hook(context.Background(), sess, turn); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestNarrationGuardHook_TurnStillPersists(t *testing.T) {
+	// Guardrail must never prevent turn persistence
+	dir := t.TempDir()
+	cfg := config.SessionConfig{StorageDir: dir, MaxTurnsInContext: 50, MaxFileSizeMB: 10}
+	mgr := NewSessionManager(cfg)
+	sess, _ := mgr.ResolveOrCreate(context.Background(), "guard:test")
+
+	persistHook := PersistSessionHook(mgr)
+	guardHook := NarrationGuardHook()
+
+	turn := SessionTurn{
+		TurnID:            "guard-turn",
+		Timestamp:         time.Now().UTC(),
+		UserMessage:       "read the repo",
+		AssistantResponse: "I am fetching all files in parallel.",
+		ToolEventCount:    0,
+	}
+
+	// Both hooks run; neither should error
+	if err := persistHook(context.Background(), sess, turn); err != nil {
+		t.Fatalf("persist hook: %v", err)
+	}
+	if err := guardHook(context.Background(), sess, turn); err != nil {
+		t.Fatalf("guard hook: %v", err)
+	}
+
+	// Turn was persisted regardless of guard
+	path := filepath.Join(dir, "guard_test.jsonl")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read JSONL: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("JSONL file is empty — turn was not persisted")
+	}
+}
