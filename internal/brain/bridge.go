@@ -79,6 +79,20 @@ func (b *GBrainBridge) Available() bool {
 	return b.available.Load()
 }
 
+// CreateEntities stores extracted entities via the MCP create_entities tool.
+// Satisfies session.BrainWriter.
+func (b *GBrainBridge) CreateEntities(ctx context.Context, entitiesJSON json.RawMessage) error {
+	if !b.available.Load() {
+		return ErrBrainUnavailable
+	}
+	input, err := json.Marshal(map[string]json.RawMessage{"entities": entitiesJSON})
+	if err != nil {
+		return err
+	}
+	_, err = b.client.CallTool(ctx, "create_entities", input)
+	return err
+}
+
 // SearchEntities satisfies session.BrainSearcher for the cold opener.
 // Returns "" on unavailability — never errors.
 func (b *GBrainBridge) SearchEntities(ctx context.Context, query string, limit int) (string, error) {

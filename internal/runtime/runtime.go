@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/google/uuid"
 
 	"github.com/dydanz/akb48/internal/brain"
@@ -113,9 +115,11 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 	}
 
 	metricsPath := cfg.Session.StorageDir + "/tool-calls.jsonl"
+	extractor := makeExtractor(cfg, cliExec)
 	rt.hooks = []session.HookFunc{
 		session.PersistSessionHook(sessionMgr),
 		session.LogMetricsHook(metricsPath),
+		session.CompactionHook(cfg.Session, sessionMgr, brainBridge, extractor),
 	}
 
 	slog.Info("AKB48 initialised",
@@ -335,6 +339,77 @@ func writeMCPConfigFile(b *brain.GBrainBridge) (string, error) {
 	}
 	f.Close()
 	return f.Name(), nil
+}
+
+// makeExtractor returns a session.Extractor that calls haiku for entity extraction + summarisation.
+// Falls back gracefully: missing API key → empty entities + turn count summary.
+func makeExtractor(cfg *config.Config, cliExec claudecli.CLIExecutor) session.Extractor {
+	model := cfg.LLM.ExtractionModel
+	if model == "" {
+		model = cfg.LLM.Model
+	}
+
+	return func(ctx context.Context, turns []session.SessionTurn) (json.RawMessage, string, error) {
+		var sb strings.Builder
+		for _, t := range turns {
+			sb.WriteString("USER: " + t.UserMessage + "\n")
+			sb.WriteString("ASSISTANT: " + t.AssistantResponse + "\n\n")
+		}
+		body := sb.String()
+
+		extractPrompt := "Extract named entities from the conversation. Return a JSON array only — no prose. " +
+			"Each element: {\"name\":\"...\",\"entityType\":\"person|project|decision|product|policy|infra\",\"observations\":[\"one-line fact\"]}. " +
+			"Only facts worth remembering weeks from now.\n\n" + body
+
+		summaryPrompt := "Summarise these conversation turns in 2-3 sentences. " +
+			"Focus on decisions made, tasks completed, and open questions. Be specific.\n\n" + body
+
+		fallbackSummary := fmt.Sprintf("Compacted %d turns.", len(turns))
+
+		// cli backend: use CLILLMClient (single-shot subprocess)
+		if cfg.LLM.Backend == "claude-cli" && cliExec != nil {
+			client := claudecli.NewCLILLMClient(cliExec)
+			rawEntities, err := client.Call(ctx, "Return only valid JSON.", extractPrompt, model)
+			var entitiesJSON json.RawMessage
+			if err == nil {
+				entitiesJSON = session.ParseEntitiesJSON(rawEntities)
+			}
+			summary, err := client.Call(ctx, "You are a concise technical summariser.", summaryPrompt, model)
+			if err != nil || summary == "" {
+				summary = fallbackSummary
+			}
+			return entitiesJSON, summary, nil
+		}
+
+		// api backend: Anthropic SDK single-shot (no streaming, no tool loop)
+		apiKey := os.Getenv(cfg.LLM.APIKeyEnv)
+		if apiKey == "" {
+			return nil, fallbackSummary, nil
+		}
+		client := anthropic.NewClient(option.WithAPIKey(apiKey))
+
+		var entitiesJSON json.RawMessage
+		resp, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+			Model:     anthropic.Model(model),
+			MaxTokens: 1024,
+			Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock(extractPrompt))},
+		})
+		if err == nil && len(resp.Content) > 0 {
+			entitiesJSON = session.ParseEntitiesJSON(resp.Content[0].Text)
+		}
+
+		summary := fallbackSummary
+		resp2, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+			Model:     anthropic.Model(model),
+			MaxTokens: 256,
+			Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock(summaryPrompt))},
+		})
+		if err == nil && len(resp2.Content) > 0 && resp2.Content[0].Text != "" {
+			summary = resp2.Content[0].Text
+		}
+
+		return entitiesJSON, summary, nil
+	}
 }
 
 // defaultAllowedTools returns the compiled default cli-mode toolset.

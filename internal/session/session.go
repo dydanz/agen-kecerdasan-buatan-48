@@ -146,6 +146,23 @@ func LoadFromDisk(filePath string) (*Session, error) {
 			continue
 		}
 
+		// Try compaction record — replaces turns_replaced oldest turns with a summary turn
+		var compRec compactionRecord
+		if json.Unmarshal(raw, &compRec) == nil && compRec.Type == "compaction" {
+			summaryTurn := SessionTurn{
+				TurnID:            "compaction-summary",
+				Timestamp:         compRec.Timestamp,
+				UserMessage:       "[compacted]",
+				AssistantResponse: compRec.Summary,
+			}
+			replace := compRec.TurnsReplaced
+			if replace > len(sess.Turns) {
+				replace = len(sess.Turns)
+			}
+			sess.Turns = append([]SessionTurn{summaryTurn}, sess.Turns[replace:]...)
+			continue
+		}
+
 		// Try turn
 		var turn SessionTurn
 		if err := json.Unmarshal(raw, &turn); err != nil {
