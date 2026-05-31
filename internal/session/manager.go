@@ -95,6 +95,23 @@ func (m *SessionManager) GetContextTurns(sess *Session) []SessionTurn {
 	return turns
 }
 
+// appendCompactionRecord appends a compaction record to the session JSONL file.
+func (m *SessionManager) appendCompactionRecord(sessionID string, rec compactionRecord) error {
+	path := m.filePath(sessionID)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	line, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	line = append(line, '\n')
+	_, err = f.Write(line)
+	return err
+}
+
 // Persist appends one turn to the session JSONL file.
 func (m *SessionManager) Persist(sess *Session, turn SessionTurn) error {
 	path := m.filePath(sess.SessionID)
