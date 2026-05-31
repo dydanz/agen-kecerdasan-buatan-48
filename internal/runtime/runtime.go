@@ -23,6 +23,7 @@ import (
 	"github.com/dydanz/akb48/internal/skills"
 	"github.com/dydanz/akb48/internal/tools"
 	githubtools "github.com/dydanz/akb48/internal/tools/github"
+	searchtools "github.com/dydanz/akb48/internal/tools/search"
 	"github.com/dydanz/akb48/internal/types"
 )
 
@@ -61,6 +62,8 @@ func New(cfg *config.Config) (*AKB48Runtime, error) {
 	// Register built-in tools.
 	ghDef, ghHandler := githubtools.NewHandler(envReader, cfg.LLM.MaxToolResultTokens)
 	registry.Register(ghDef, ghHandler)
+	searchDef, searchHandler := searchtools.NewHandler(envReader, cfg.LLM.MaxToolResultTokens)
+	registry.Register(searchDef, searchHandler)
 	caller := llm.NewCaller(cfg, registry)
 	sessionMgr := session.NewSessionManager(cfg.Session)
 
