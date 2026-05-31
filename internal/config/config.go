@@ -9,13 +9,14 @@ import (
 )
 
 type LLMConfig struct {
-	Backend             string `toml:"backend"`
-	Model               string `toml:"model"`
-	ExtractionModel     string `toml:"extraction_model"`
-	APIKeyEnv           string `toml:"api_key_env"`
-	MaxTokens           int    `toml:"max_tokens"`
-	MaxToolRounds       int    `toml:"max_tool_rounds"`
-	MaxToolResultTokens int    `toml:"max_tool_result_tokens"`
+	Backend             string   `toml:"backend"`
+	Model               string   `toml:"model"`
+	ExtractionModel     string   `toml:"extraction_model"`
+	APIKeyEnv           string   `toml:"api_key_env"`
+	MaxTokens           int      `toml:"max_tokens"`
+	MaxToolRounds       int      `toml:"max_tool_rounds"`
+	MaxToolResultTokens int      `toml:"max_tool_result_tokens"`
+	AllowedTools        []string `toml:"allowed_tools"`
 }
 
 type CLIConfig struct {

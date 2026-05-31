@@ -4,6 +4,7 @@
 
 [llm]
 backend = "claude-cli"   # "api" | "claude-cli"
+allowed_tools = []  # empty = compiled default: Bash, Read, Write, Glob, Grep, WebFetch (+ ToolSearch when brain connected)
 model = "claude-sonnet-4-6"
 extraction_model = "claude-haiku-4-5-20251001"
 # claude-cli mode: auth via CLAUDE_CODE_OAUTH_TOKEN env var in .env (no api_key_env needed)

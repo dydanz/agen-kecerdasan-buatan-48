@@ -164,6 +164,13 @@ func (r *AKB48Runtime) HandleMessage(ctx context.Context, msg types.Message, tok
 }
 
 func (r *AKB48Runtime) handleAPI(ctx context.Context, sess *session.Session, text string, tokens chan<- string, turnID string) (string, types.TokenUsage, error) {
+	apiTools := r.registry.Definitions()
+	toolNames := make([]string, len(apiTools))
+	for i, d := range apiTools {
+		toolNames[i] = d.Name
+	}
+	slog.Info("agent toolset", "backend", "api", "tools", toolNames)
+
 	coldContext := ""
 	if r.coldOpener != nil {
 		coldContext = r.coldOpener.BuildColdContext(ctx, sess, text)
@@ -208,11 +215,24 @@ func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, tex
 		}
 	}
 
-	// Allow ToolSearch so LLM can load deferred mcp__gbrain__* schemas.
-	var allowedTools []string
-	if mcpConfigPath != "" {
-		allowedTools = []string{"ToolSearch"}
+	// Resolve tool allowlist: config override takes precedence; empty → compiled default.
+	// defaultAllowedTools always includes built-ins so brain-down never yields zero tools.
+	allowedTools := r.cfg.LLM.AllowedTools
+	if len(allowedTools) == 0 {
+		allowedTools = defaultAllowedTools(mcpConfigPath != "")
+	} else if mcpConfigPath != "" {
+		hasToolSearch := false
+		for _, t := range allowedTools {
+			if t == "ToolSearch" {
+				hasToolSearch = true
+				break
+			}
+		}
+		if !hasToolSearch {
+			allowedTools = append(allowedTools, "ToolSearch")
+		}
 	}
+	slog.Info("agent toolset", "backend", "claude-cli", "tools", allowedTools)
 
 	ch, err := r.cliExec.Execute(ctx, claudecli.CLIRequest{
 		Prompt:             text,
@@ -315,6 +335,17 @@ func writeMCPConfigFile(b *brain.GBrainBridge) (string, error) {
 	}
 	f.Close()
 	return f.Name(), nil
+}
+
+// defaultAllowedTools returns the compiled default cli-mode toolset.
+// Built-in tools are always present so brain-down never yields zero tools.
+// ToolSearch is added only when MCP config is present (brain connected).
+func defaultAllowedTools(mcpPresent bool) []string {
+	base := []string{"Bash", "Read", "Write", "Glob", "Grep", "WebFetch"}
+	if mcpPresent {
+		return append(base, "ToolSearch")
+	}
+	return base
 }
 
 func countSkillDirs(dir string) int {

@@ -1,5 +1,6 @@
 [llm]
 backend = "api"   # "api" | "claude-cli"
+allowed_tools = []  # empty = compiled default: Bash, Read, Write, Glob, Grep, WebFetch (+ ToolSearch when brain connected)
 model = "claude-sonnet-4-6"
 extraction_model = "claude-haiku-4-5-20251001"
 api_key_env = "ANTHROPIC_API_KEY"
@@ -13,7 +14,7 @@ enabled = true
 [adapters.discord]
 enabled = true
 token_env = "DISCORD_BOT_TOKEN"
-allowed_user_ids = []          # Add your Discord snowflake user ID (string)
+allowed_user_ids = ["1486543684374757416", "691898565261393948"]          # Add your Discord snowflake user ID (string)
 streaming_interval_ms = 1000
 slash_commands = true
 slash_command_guild_id = ""    # Set guild ID for instant /ask registration during dev
