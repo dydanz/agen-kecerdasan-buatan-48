@@ -57,3 +57,9 @@ dir = "/app/skills"
 
 [identity]
 dir = "/app/identity"
+
+# Extra SSE/HTTP MCP servers exposed to the claude subprocess in claude-cli mode.
+[[extra_mcp_servers]]
+name      = "clickhouse"
+url_env   = "OFFICE_MCP_CH_URL"
+token_env = "OFFICE_MCP_CH_AUTH_BEARER_TOKEN"
