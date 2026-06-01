@@ -297,21 +297,27 @@ func (a *Adapter) processInteraction(s *discordgo.Session, i *discordgo.Interact
 
 // sendStreaming sends tokens as progressive edits to a placeholder message.
 // ref is non-nil for guild @mention replies — uses ChannelMessageSendReply for threading.
+//
+// Overflow handling: when buf exceeds overflowAt the current message is finalised and
+// msgID is cleared. The ticker creates the NEXT message only when it has actual content —
+// preventing a second bare ▍ placeholder from appearing while the stream is still running.
 func (a *Adapter) sendStreaming(channelID string, tokens <-chan string, ref *discordgo.MessageReference) error {
 	interval := time.Duration(a.cfg.StreamingIntervalMs) * time.Millisecond
 
-	sendPlaceholder := func() (*discordgo.Message, error) {
+	// sendMsg creates a new Discord message (reply or plain) with the given text.
+	sendMsg := func(text string) (*discordgo.Message, error) {
 		if ref != nil {
-			return a.session.ChannelMessageSendReply(channelID, cursor, ref)
+			return a.session.ChannelMessageSendReply(channelID, text, ref)
 		}
-		return a.session.ChannelMessageSend(channelID, cursor)
+		return a.session.ChannelMessageSend(channelID, text)
 	}
 
-	placeholder, err := sendPlaceholder()
+	// Send the initial cursor placeholder so the user sees an immediate response.
+	placeholder, err := sendMsg(cursor)
 	if err != nil {
 		return fmt.Errorf("send placeholder: %w", err)
 	}
-	msgID := placeholder.ID
+	msgID := placeholder.ID // empty string signals "need a new message before next edit"
 
 	var buf strings.Builder
 	ticker := time.NewTicker(interval)
@@ -321,24 +327,44 @@ func (a *Adapter) sendStreaming(channelID string, tokens <-chan string, ref *dis
 		select {
 		case token, ok := <-tokens:
 			if !ok {
+				// Stream ended.
+				if msgID == "" {
+					// Overflow happened but next message not created yet — send remaining content.
+					if buf.Len() > 0 {
+						if _, err := sendMsg(buf.String()); err != nil {
+							slog.Warn("Discord: deferred overflow send failed", "error", err)
+						}
+					}
+					return nil
+				}
 				return a.editFinal(channelID, msgID, buf.String(), ref)
 			}
 			buf.WriteString(token)
 
-			if buf.Len() > overflowAt {
+			if buf.Len() > overflowAt && msgID != "" {
+				// Finalise current message, then clear msgID.
+				// Do NOT create a new placeholder yet — ticker will create the next message
+				// only when it has content, avoiding a second bare ▍.
 				if err := a.editFinal(channelID, msgID, buf.String(), ref); err != nil {
-					slog.Warn("Discord: overflow finalize error", "error", err)
+					slog.Warn("Discord: overflow finalise error", "error", err)
 				}
-				newMsg, err := sendPlaceholder()
-				if err != nil {
-					return fmt.Errorf("send overflow placeholder: %w", err)
-				}
-				msgID = newMsg.ID
+				msgID = ""
 				buf.Reset()
 			}
 
 		case <-ticker.C:
-			if buf.Len() > 0 {
+			if buf.Len() == 0 {
+				continue
+			}
+			if msgID == "" {
+				// Post-overflow: create next message now that we have real content.
+				newMsg, err := sendMsg(buf.String() + cursor)
+				if err != nil {
+					slog.Warn("Discord: overflow continuation send failed", "error", err)
+				} else {
+					msgID = newMsg.ID
+				}
+			} else {
 				if _, err := a.session.ChannelMessageEdit(channelID, msgID, buf.String()+cursor); err != nil {
 					if isRateLimited(err) {
 						interval = min(interval*2, maxBackoff)
