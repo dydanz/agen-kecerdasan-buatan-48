@@ -340,7 +340,9 @@ func writeMCPConfigFile(b *brain.GBrainBridge, extras []config.MCPServerConfig, 
 				"name", s.Name, "url_env", s.URLEnv)
 			continue
 		}
-		srv := map[string]any{"url": url}
+		// "type":"sse" is required by Claude Code to identify SSE transport.
+		// Without it the entry is silently ignored and the agent sees no MCP tools.
+		srv := map[string]any{"type": "sse", "url": url}
 		if s.TokenEnv != "" {
 			if tok := er.Get(s.TokenEnv); tok != "" {
 				srv["headers"] = map[string]string{
