@@ -255,13 +255,28 @@ func (a *Adapter) process(channelID, userID, text string, ref *discordgo.Message
 
 	if err := a.handler(hCtx, msg, tokens); err != nil {
 		slog.Error("Discord handler error", "error", err)
+		cancel()     // stop ChannelTyping immediately — don't wait for sendStreaming
 		close(tokens)
-		wg.Wait()
+		waitWithTimeout(&wg)
 		a.session.ChannelMessageSend(channelID, fmt.Sprintf("Error: %v", err))
 		return
 	}
+	cancel()     // stop ChannelTyping immediately — don't wait for sendStreaming
 	close(tokens)
-	wg.Wait()
+	waitWithTimeout(&wg)
+}
+
+// waitWithTimeout waits for wg with a 15s hard cap.
+// Prevents process() from blocking forever if sendStreaming is stuck on a
+// rate-limited Discord API call (editFinal → ChannelMessageEdit → backoff).
+func waitWithTimeout(wg *sync.WaitGroup) {
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(15 * time.Second):
+		slog.Warn("sendStreaming did not finish within 15s — leaking goroutine")
+	}
 }
 
 func (a *Adapter) processInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, userID, text string) {
