@@ -37,8 +37,9 @@ func buildAppendContext(turns []session.SessionTurn) string {
 	result := strings.TrimRight(sb.String(), "\n")
 
 	if len(result) > maxAppendBytes {
-		slog.Warn("buildAppendContext: history exceeds 4KB — truncating to 10 turns")
-		return buildAppendContext(turns[len(turns)-10:])
+		slog.Warn("buildAppendContext: history exceeds 4KB — hard truncating",
+			"result_bytes", len(result), "turns", len(turns))
+		return result[:maxAppendBytes]
 	}
 	return result
 }

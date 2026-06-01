@@ -17,6 +17,7 @@ services:
       - logs:/app/logs
       - brain:/app/brain
       - ./config.docker.toml:/app/config.toml:ro
+      - ../.env:/app/.env:ro
 
   # GBrain + Postgres — only needed when brain.enabled = true in config.toml.
   # akb48 starts in degraded mode (brain tools unavailable) if these are not running.
