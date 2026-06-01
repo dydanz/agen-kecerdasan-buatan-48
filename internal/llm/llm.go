@@ -37,6 +37,7 @@ type CallResult struct {
 	Text       string
 	TokenUsage types.TokenUsage
 	LatencyMs  int64
+	ToolCalls  int // total tool_use blocks executed across all rounds
 }
 
 // CallerInterface is the interface for LLM call execution (used for test injection).
@@ -128,6 +129,7 @@ func (c *Caller) Call(ctx context.Context, params CallParams) (*CallResult, erro
 
 	var totalUsage types.TokenUsage
 	var finalText string
+	var totalToolCalls int
 
 	maxRounds := c.cfg.LLM.MaxToolRounds
 	if maxRounds <= 0 {
@@ -250,6 +252,7 @@ func (c *Caller) Call(ctx context.Context, params CallParams) (*CallResult, erro
 			if block.Type != "tool_use" {
 				continue
 			}
+			totalToolCalls++
 			inputJSON, err := json.Marshal(block.Input)
 			if err != nil {
 				inputJSON = json.RawMessage(`{}`)
@@ -276,6 +279,7 @@ func (c *Caller) Call(ctx context.Context, params CallParams) (*CallResult, erro
 		Text:       finalText,
 		TokenUsage: totalUsage,
 		LatencyMs:  latencyMs,
+		ToolCalls:  totalToolCalls,
 	}, nil
 }
 
