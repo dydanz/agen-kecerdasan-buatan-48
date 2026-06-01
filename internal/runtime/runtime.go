@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -258,6 +259,8 @@ func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, tex
 
 	var sb strings.Builder
 	var toolEventCount int
+	toolCounts := map[string]int{} // tool name → call count this turn
+
 	for evt := range ch {
 		switch evt.Type {
 		case "text":
@@ -269,15 +272,35 @@ func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, tex
 			}
 		case "tool_use":
 			toolEventCount++
-			indicator := fmt.Sprintf("\n⚙ %s\n", evt.ToolName)
-			select {
-			case tokens <- indicator:
-			default:
-			}
+			toolCounts[evt.ToolName]++ // count silently; summary emitted after loop
 		case "error":
 			return sb.String(), toolEventCount, evt.Err
 		}
 	}
+
+	// Emit one compact summary line instead of per-call indicators.
+	if len(toolCounts) > 0 {
+		names := make([]string, 0, len(toolCounts))
+		for n := range toolCounts {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		var parts []string
+		for _, n := range names {
+			c := toolCounts[n]
+			if c == 1 {
+				parts = append(parts, n)
+			} else {
+				parts = append(parts, fmt.Sprintf("%s ×%d", n, c))
+			}
+		}
+		summary := "\n⚙ Ran: " + strings.Join(parts, ", ") + "\n"
+		select {
+		case tokens <- summary:
+		default:
+		}
+	}
+
 	return sb.String(), toolEventCount, nil
 }
 
