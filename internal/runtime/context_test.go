@@ -58,3 +58,27 @@ func TestBuildAppendContext_LimitsTo20Turns(t *testing.T) {
 		t.Errorf("expected max 20 turns, got %d", count)
 	}
 }
+
+// Regression: 10 turns each with 500-char responses exceed 4KB.
+// Old code recursed with same input → infinite loop → container crash.
+// New code hard-truncates without recursing.
+func TestBuildAppendContext_NoInfiniteRecursionOn4KBOverflow(t *testing.T) {
+	// Each turn: 500 char assistant response × 10 turns ≈ 5KB — exceeds 4KB cap.
+	bigResponse := strings.Repeat("x", 500)
+	turns := make([]session.SessionTurn, 10)
+	for i := range turns {
+		turns[i] = session.SessionTurn{
+			UserMessage:       "what is the battery count?",
+			AssistantResponse: bigResponse,
+		}
+	}
+	// Must not hang, panic, or recurse.
+	got := buildAppendContext(turns)
+	if len(got) > maxAppendBytes+1 {
+		t.Errorf("result exceeds maxAppendBytes: got %d bytes", len(got))
+	}
+	// Must return something (not empty).
+	if got == "" {
+		t.Error("expected non-empty result")
+	}
+}
