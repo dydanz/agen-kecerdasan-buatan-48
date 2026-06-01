@@ -218,7 +218,7 @@ func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, tex
 	// Wire brain as MCP server so claude subprocess can call gbrain_* tools.
 	mcpConfigPath := ""
 	if r.bridge != nil && r.bridge.Available() {
-		mcpConfigPath, err = writeMCPConfigFile(r.bridge)
+		mcpConfigPath, err = writeMCPConfigFile(r.bridge, r.cfg.ExtraMCPServers, r.envReader)
 		if err != nil {
 			slog.Warn("failed to write MCP config — brain tools unavailable this turn", "error", err)
 		} else {
@@ -358,10 +358,45 @@ func (r *AKB48Runtime) EnvReader() *env.Reader {
 	return r.envReader
 }
 
-// writeMCPConfigFile writes brain MCP config to a temp file and returns its path.
+// writeMCPConfigFile writes the combined MCP config (brain + extra SSE servers) to a temp file.
 // Caller must os.Remove the file when done.
-func writeMCPConfigFile(b *brain.GBrainBridge) (string, error) {
-	data, err := b.CLIMCPConfig()
+func writeMCPConfigFile(b *brain.GBrainBridge, extras []config.MCPServerConfig, er *env.Reader) (string, error) {
+	// Start with the brain server config.
+	var mcpCfg map[string]any
+	if err := json.Unmarshal(func() []byte {
+		d, _ := b.CLIMCPConfig()
+		return d
+	}(), &mcpCfg); err != nil {
+		return "", fmt.Errorf("parse brain MCP config: %w", err)
+	}
+
+	servers, _ := mcpCfg["mcpServers"].(map[string]any)
+	if servers == nil {
+		servers = map[string]any{}
+		mcpCfg["mcpServers"] = servers
+	}
+
+	// Merge extra SSE/HTTP MCP servers from config.
+	for _, s := range extras {
+		url := er.Get(s.URLEnv)
+		if url == "" {
+			slog.Warn("extra MCP server skipped — URL env var not set or not declared in .env",
+				"name", s.Name, "url_env", s.URLEnv)
+			continue
+		}
+		srv := map[string]any{"url": url}
+		if s.TokenEnv != "" {
+			if tok := er.Get(s.TokenEnv); tok != "" {
+				srv["headers"] = map[string]string{
+					"Authorization": "Bearer " + tok,
+				}
+			}
+		}
+		servers[s.Name] = srv
+		slog.Info("extra MCP server wired", "name", s.Name)
+	}
+
+	data, err := json.Marshal(mcpCfg)
 	if err != nil {
 		return "", err
 	}

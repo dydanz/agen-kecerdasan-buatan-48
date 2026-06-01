@@ -75,13 +75,22 @@ type IdentityConfig struct {
 	Dir string `toml:"dir"`
 }
 
+// MCPServerConfig describes an external SSE/HTTP MCP server to expose to the claude subprocess.
+// URL and token are read from env vars at runtime — never stored as values.
+type MCPServerConfig struct {
+	Name     string `toml:"name"`      // server name in mcpServers map (e.g. "clickhouse")
+	URLEnv   string `toml:"url_env"`   // env var holding the SSE endpoint URL
+	TokenEnv string `toml:"token_env"` // env var holding the Bearer token (empty = no auth)
+}
+
 type Config struct {
-	LLM      LLMConfig      `toml:"llm"`
-	Adapters AdaptersConfig `toml:"adapters"`
-	Brain    BrainConfig    `toml:"brain"`
-	Session  SessionConfig  `toml:"session"`
-	Skills   SkillsConfig   `toml:"skills"`
-	Identity IdentityConfig `toml:"identity"`
+	LLM             LLMConfig         `toml:"llm"`
+	Adapters        AdaptersConfig    `toml:"adapters"`
+	Brain           BrainConfig       `toml:"brain"`
+	Session         SessionConfig     `toml:"session"`
+	Skills          SkillsConfig      `toml:"skills"`
+	Identity        IdentityConfig    `toml:"identity"`
+	ExtraMCPServers []MCPServerConfig `toml:"extra_mcp_servers"`
 }
 
 func Load(path string) (*Config, error) {
