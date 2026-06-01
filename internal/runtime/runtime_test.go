@@ -9,6 +9,7 @@ import (
 
 	"github.com/dydanz/akb48/internal/config"
 	"github.com/dydanz/akb48/internal/llm"
+	"github.com/dydanz/akb48/internal/llm/claudecli"
 	"github.com/dydanz/akb48/internal/session"
 	"github.com/dydanz/akb48/internal/types"
 )
@@ -299,6 +300,40 @@ func TestRuntime_ColdOpenerNilWhenNoBrain(t *testing.T) {
 	rt, _ := testRuntime(t)
 	if rt.coldOpener != nil {
 		t.Error("cold opener should be nil when brain is disabled")
+	}
+}
+
+// Regression: handleCLI used `for range ch` which has no ctx.Done() escape.
+// When the subprocess stalls (e.g. MCP SSE hang), ch never closes, handler blocks
+// forever → ChannelTyping loops forever → "typing" forever in Discord.
+// Fix: explicit select with ctx.Done() in the event loop.
+// This test simulates a stalled subprocess (ch never closes) and asserts that
+// the handler returns within the context timeout.
+func TestHandleCLI_ReturnsOnContextTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	// ch that never closes — simulates a subprocess stalled on a tool call.
+	stalledCh := make(chan claudecli.CLIEvent, 1)
+	stalledCh <- claudecli.CLIEvent{Type: "text", Content: "What's up?"} // partial output
+	// ch is never closed after this — mimics MCP SSE hang
+
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := drainCLIEvents(ctx, stalledCh, make(chan string, 64))
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("expected context error, got nil")
+		}
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("expected DeadlineExceeded, got %v", err)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("drainCLIEvents did not return within 1s — ctx escape missing")
 	}
 }
 
