@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -17,6 +18,14 @@ import (
 	"github.com/dydanz/akb48/internal/runtime"
 	"github.com/dydanz/akb48/internal/types"
 )
+
+// processedMsgTTL is how long a processed message ID is remembered to deduplicate
+// duplicate Gateway events (e.g., two container instances sharing the same bot token).
+const processedMsgTTL = 5 * time.Minute
+
+// handlerTimeout is the maximum time the LLM handler may take per turn.
+// Prevents the placeholder from staying as ▍ forever when the backend hangs.
+const handlerTimeout = 90 * time.Second
 
 const (
 	maxMsgLen  = 2000
@@ -40,9 +49,11 @@ var askCommand = &discordgo.ApplicationCommand{
 
 // Adapter handles Discord Gateway events and per-message streaming.
 type Adapter struct {
-	session *discordgo.Session
-	cfg     config.DiscordConfig
-	handler runtime.MessageHandler
+	session       *discordgo.Session
+	cfg           config.DiscordConfig
+	handler       runtime.MessageHandler
+	started       atomic.Bool
+	processedMsgs sync.Map // map[string]time.Time — message ID deduplication
 }
 
 // New creates a Discord adapter. Returns error if bot token is missing.
@@ -60,7 +71,12 @@ func New(cfg config.DiscordConfig, handler runtime.MessageHandler) (*Adapter, er
 }
 
 // Start opens the Gateway connection and blocks until ctx is cancelled.
+// Safe to call only once — returns error on a second call to prevent duplicate handlers.
 func (a *Adapter) Start(ctx context.Context) error {
+	if !a.started.CompareAndSwap(false, true) {
+		return fmt.Errorf("discord adapter already started — double Start() would register duplicate handlers")
+	}
+
 	a.session.AddHandler(a.onMessage)
 	a.session.AddHandler(a.onInteraction)
 	a.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
@@ -84,6 +100,21 @@ func (a *Adapter) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author == nil || m.Author.Bot {
 		return
 	}
+
+	// Deduplicate: drop duplicate Gateway events for the same message ID.
+	// Protects against two container instances sharing the same bot token,
+	// or any other scenario where onMessage fires twice for one Discord event.
+	if _, seen := a.processedMsgs.LoadOrStore(m.ID, time.Now()); seen {
+		slog.Debug("Discord: duplicate message event dropped", "message_id", m.ID)
+		return
+	}
+	// Purge stale entries to prevent unbounded growth.
+	a.processedMsgs.Range(func(k, v any) bool {
+		if time.Since(v.(time.Time)) > processedMsgTTL {
+			a.processedMsgs.Delete(k)
+		}
+		return true
+	})
 
 	ch, err := s.State.Channel(m.ChannelID)
 	if err != nil {
@@ -218,7 +249,11 @@ func (a *Adapter) process(channelID, userID, text string, ref *discordgo.Message
 		}
 	}()
 
-	if err := a.handler(ctx, msg, tokens); err != nil {
+	// Enforce a hard timeout so the placeholder never stays as ▍ forever.
+	hCtx, hCancel := context.WithTimeout(ctx, handlerTimeout)
+	defer hCancel()
+
+	if err := a.handler(hCtx, msg, tokens); err != nil {
 		slog.Error("Discord handler error", "error", err)
 		close(tokens)
 		wg.Wait()
