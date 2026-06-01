@@ -257,51 +257,7 @@ func (r *AKB48Runtime) handleCLI(ctx context.Context, sess *session.Session, tex
 		return "", 0, fmt.Errorf("cli execute: %w", err)
 	}
 
-	var sb strings.Builder
-	var toolEventCount int
-	toolCounts := map[string]int{} // tool name → call count this turn
-
-	for evt := range ch {
-		switch evt.Type {
-		case "text":
-			sb.WriteString(evt.Content)
-			select {
-			case tokens <- evt.Content:
-			case <-ctx.Done():
-				return sb.String(), toolEventCount, ctx.Err()
-			}
-		case "tool_use":
-			toolEventCount++
-			toolCounts[evt.ToolName]++ // count silently; summary emitted after loop
-		case "error":
-			return sb.String(), toolEventCount, evt.Err
-		}
-	}
-
-	// Emit one compact summary line instead of per-call indicators.
-	if len(toolCounts) > 0 {
-		names := make([]string, 0, len(toolCounts))
-		for n := range toolCounts {
-			names = append(names, n)
-		}
-		sort.Strings(names)
-		var parts []string
-		for _, n := range names {
-			c := toolCounts[n]
-			if c == 1 {
-				parts = append(parts, n)
-			} else {
-				parts = append(parts, fmt.Sprintf("%s ×%d", n, c))
-			}
-		}
-		summary := "\n⚙ Ran: " + strings.Join(parts, ", ") + "\n"
-		select {
-		case tokens <- summary:
-		default:
-		}
-	}
-
-	return sb.String(), toolEventCount, nil
+	return drainCLIEvents(ctx, ch, tokens)
 }
 
 // Start loads sessions and prepares the runtime.
@@ -482,6 +438,70 @@ func makeExtractor(cfg *config.Config, cliExec claudecli.CLIExecutor) session.Ex
 
 		return entitiesJSON, summary, nil
 	}
+}
+
+// drainCLIEvents consumes events from the claude subprocess channel, forwarding
+// text tokens to the caller. Returns when ch is closed, an error event arrives,
+// or ctx is cancelled — whichever comes first.
+//
+// The explicit ctx.Done() case in the select is the critical fix for the
+// "typing forever" bug: without it, a subprocess stalled on a tool call (e.g.
+// a hanging MCP SSE connection) causes ch to sit idle indefinitely, blocking
+// the caller even after the context deadline has passed.
+func drainCLIEvents(ctx context.Context, ch <-chan claudecli.CLIEvent, tokens chan<- string) (string, int, error) {
+	var sb strings.Builder
+	var toolEventCount int
+	toolCounts := map[string]int{}
+
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			return sb.String(), toolEventCount, ctx.Err()
+		case evt, ok := <-ch:
+			if !ok {
+				break loop
+			}
+			switch evt.Type {
+			case "text":
+				sb.WriteString(evt.Content)
+				select {
+				case tokens <- evt.Content:
+				case <-ctx.Done():
+					return sb.String(), toolEventCount, ctx.Err()
+				}
+			case "tool_use":
+				toolEventCount++
+				toolCounts[evt.ToolName]++
+			case "error":
+				return sb.String(), toolEventCount, evt.Err
+			}
+		}
+	}
+
+	// Emit one compact summary line instead of per-call indicators.
+	if len(toolCounts) > 0 {
+		names := make([]string, 0, len(toolCounts))
+		for n := range toolCounts {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		var parts []string
+		for _, n := range names {
+			c := toolCounts[n]
+			if c == 1 {
+				parts = append(parts, n)
+			} else {
+				parts = append(parts, fmt.Sprintf("%s ×%d", n, c))
+			}
+		}
+		summary := "\n⚙ Ran: " + strings.Join(parts, ", ") + "\n"
+		select {
+		case tokens <- summary:
+		default:
+		}
+	}
+	return sb.String(), toolEventCount, nil
 }
 
 // defaultAllowedTools returns the compiled default cli-mode toolset.
