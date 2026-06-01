@@ -54,6 +54,14 @@ type Adapter struct {
 	handler       runtime.MessageHandler
 	started       atomic.Bool
 	processedMsgs sync.Map // map[string]time.Time — message ID deduplication
+	sessionQueues sync.Map // map[sessionID]chan processJob — per-session serialization
+}
+
+type processJob struct {
+	channelID string
+	userID    string
+	text      string
+	ref       *discordgo.MessageReference
 }
 
 // New creates a Discord adapter. Returns error if bot token is missing.
@@ -131,7 +139,7 @@ func (a *Adapter) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 			slog.Debug("Discord: DM from non-allowed user dropped", "user_id", m.Author.ID)
 			return
 		}
-		go a.process(m.ChannelID, m.Author.ID, m.Content, nil)
+		a.enqueue(m.ChannelID, m.Author.ID, m.Content, nil)
 
 	case discordgo.ChannelTypeGuildText, discordgo.ChannelTypeGuildNews:
 		if !a.cfg.MentionResponse {
@@ -147,7 +155,35 @@ func (a *Adapter) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if text == "" {
 			return
 		}
-		go a.process(m.ChannelID, m.Author.ID, text, m.Reference())
+		a.enqueue(m.ChannelID, m.Author.ID, text, m.Reference())
+	}
+}
+
+// enqueue serialises messages per session: new messages for the same user wait
+// until the previous one completes. Prevents concurrent handlers from racing on
+// the same session, which caused the agent to lose context ("What's up?" bug).
+func (a *Adapter) enqueue(channelID, userID, text string, ref *discordgo.MessageReference) {
+	sessionID := fmt.Sprintf("main:discord:%s", userID)
+	job := processJob{channelID: channelID, userID: userID, text: text, ref: ref}
+
+	// LoadOrStore: first message for this session creates the worker goroutine.
+	ch := make(chan processJob, 16)
+	actual, loaded := a.sessionQueues.LoadOrStore(sessionID, ch)
+	if loaded {
+		ch = actual.(chan processJob)
+	} else {
+		// Start the per-session worker.
+		go func() {
+			for j := range ch {
+				a.process(j.channelID, j.userID, j.text, j.ref)
+			}
+		}()
+	}
+
+	select {
+	case ch <- job:
+	default:
+		slog.Warn("Discord: session queue full — dropping message", "session_id", sessionID)
 	}
 }
 
