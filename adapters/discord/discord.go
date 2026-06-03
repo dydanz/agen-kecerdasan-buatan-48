@@ -378,7 +378,17 @@ func (a *Adapter) sendStreaming(channelID string, tokens <-chan string, ref *dis
 		select {
 		case token, ok := <-tokens:
 			if !ok {
-				// Stream ended.
+				// Stream ended. Stop ticker immediately and drain any buffered tick so
+				// it cannot race with editFinal and re-add the cursor after we remove it.
+				// Without this, the ticker case can win the select and call
+				// ChannelMessageEdit(+cursor), which triggers Discord rate limiting (60s
+				// backoff). The leaked goroutine then loops forever adding the cursor back.
+				ticker.Stop()
+				select {
+				case <-ticker.C:
+				default:
+				}
+
 				if msgID == "" {
 					// Overflow happened but next message not created yet — send remaining content.
 					if buf.Len() > 0 {
